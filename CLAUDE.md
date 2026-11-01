@@ -27,6 +27,11 @@ Home Assistant custom integration `pixel_clock` for iPixel Color BLE LED panels 
   `/pixel-clock` (created by script via lovelace/config/save).
 - README images come from `tools/docs_images.py`; Action article: action.com/de-de/p/3226274.
 
+- USB of the panel is power only (2026-11-01: plugged into the laptop with the original cable,
+  no new PnP device at all). Control is BLE only.
+- Page settings live in the entry options; the device page has switches/selects writing the same
+  options (coordinator.async_set_option), the options form keeps keys it does not show.
+
 ## Ideas not done yet
 
 - Animated LaMetric icons (only the first frame is used), night dimming, 12 h clock.

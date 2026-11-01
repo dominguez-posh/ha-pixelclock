@@ -29,7 +29,8 @@ panels (32×16 … 448×32, e.g. BGLight) speak the same protocol; the size is r
 | Next appointment from one or more calendars | Night mode (dim or off) |
 | Further sensors, one page each | Own pages and notifications from any automation |
 
-Notifications appear within about two seconds and scroll when the text is long:
+The page on screen follows its entity live (e.g. power consumption, at most one update per
+second). Notifications appear within about two seconds and scroll when the text is long:
 
 <p align="center"><img src="docs/images/notification.gif" alt="Scrolling notification" width="660"></p>
 
@@ -57,6 +58,7 @@ an image file from an allowed folder such as `/config/www/`.
   [ESPHome Bluetooth proxy](https://esphome.io/components/bluetooth_proxy/)
 
 Home Assistant keeps the connection open, so the iPixels app cannot connect at the same time.
+The USB cable only powers the panel (tested: no USB device shows up), so control is Bluetooth only.
 
 ## Installation
 
@@ -86,6 +88,8 @@ Click to import, then **Create automation** from the blueprint and choose your e
 | Entity | |
 |---|---|
 | Light | Power and brightness |
+| Switches *Page clock / date / weather / power / appointments* | Built-in pages of this panel (device page → configuration) |
+| Selects *Weather / Power / Appointments source* | Entity feeding the page; same settings as the ⚙ options |
 | Image *Preview* | Live picture of what the panel shows (animated while text scrolls) – put it on a dashboard with a picture entity card |
 | Select *Mode* | *Apps* (rotation rendered by Home Assistant) or *Built-in clock* (the panel's own clock face) |
 | Select *Orientation* | Landscape, portrait (left or right end on top), upside down |
