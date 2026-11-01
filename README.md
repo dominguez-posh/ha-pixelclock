@@ -28,7 +28,7 @@ starts with clock and date.
 
 | Kind | Shows | Settings |
 |---|---|---|
-| **Clock** | HH:MM with blinking colon, small running seconds, weekday bar | seconds, weekday bar |
+| **Clock** | big HH:MM with blinking colon, small running seconds, 2 px weekday bar (today highlighted) | seconds, weekday bar |
 | **Date** | weekday and date | |
 | **Weather** | condition icon and temperature | weather entity |
 | **Value** | any entity – temperature, battery, CO₂ … | label, unit, decimals, progress bar (min/max) |
@@ -91,7 +91,8 @@ The USB cable only powers the panel (tested: no USB device shows up), so control
 3. The panel shows up under **Settings → Devices & services → Discovered** → **Add**.
 4. **Add page** for every app you want; **Configure** (⚙) sets the default text colour.
 
-Updating from 0.1 (pages in the options): the pages are turned into apps automatically.
+Updating from 0.1 (pages in the options): the pages, including their on/off state, are turned into
+apps automatically.
 
 Manual alternative: copy `custom_components/pixel_clock` into `config/custom_components` and restart.
 
@@ -159,16 +160,23 @@ action goes to all panels.
 ```mermaid
 flowchart LR
   HA["Home Assistant<br/>states, calendars, automations"] --> C["pixel_clock<br/>page rotation + notifications"]
-  C --> R["Renderer (Pillow)<br/>5×7 pixel font, icons,<br/>rotation for portrait"]
+  A["Apps per panel<br/>(subentries)"] --> C
+  C --> R["Renderer (Pillow)<br/>5×7 pixel font, 48 icons,<br/>effects, portrait rotation"]
   R -->|PNG / GIF| B["Bluetooth<br/>host adapter or ESPHome proxy"]
   B --> P["LED panel 64×16"]
   R -->|preview| I["Image entity"]
 ```
 
-Home Assistant renders every screen itself and uploads it as PNG, or as GIF for scrolling text
-and the blinking colon. A still image is a few hundred bytes, a scrolling line 10–25 KB; uploads
-use writes without response with the panel's window acknowledgements (≈50 KB/s), so even long
-text is on the panel in well under a second. Unchanged screens are not sent again.
+Home Assistant renders every screen itself and uploads it as PNG, or as GIF for scrolling text,
+background effects and the clock. A still image is a few hundred bytes, an effect loop 3–17 KB, a
+long scrolling text up to ~40 KB. Uploads mostly use writes without response, with an acknowledged
+write every 8th packet as flow control and the panel's window acknowledgements as the check; a
+40 KB text is on the panel about 2.5 s after the action (Raspberry Pi adapter). Unchanged screens
+are not sent again.
+
+The clock with seconds is one GIF that counts to the end of the current minute; it is sent once
+per minute (or when the clock comes back after another page), because sending it again restarts
+the GIF. The panel keeps its own time as well: it is set on connect and every hour.
 
 Protocol: GATT service `0x00FA`, write `FA02`, notify `FA03`; checked against the iPixels app
 3.8.1 and the reverse engineering in [pypixelcolor](https://github.com/lucagoc/pypixelcolor)

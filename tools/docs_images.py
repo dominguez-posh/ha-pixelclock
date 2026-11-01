@@ -93,7 +93,7 @@ def main() -> None:
 
     # portrait: drawn on 16x64, shown upright
     tall = [
-        render.render_clock(NOW, H, W),
+        render.render_clock(NOW, H, W, seconds=True),
         render.render_screen(Screen([Line("11°")], icon=ic("cloud")), H, W),
         render.render_screen(Screen([Line("1,1 kW", YELLOW)], icon=ic("power")), H, W),
         render.render_screen(Screen([Line("48%", GREEN)], icon=ic("car"), progress=48), H, W),
