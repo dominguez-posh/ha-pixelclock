@@ -36,6 +36,10 @@ class PixelClockClient:
     def connected(self) -> bool:
         return self._client is not None and self._client.is_connected
 
+    @property
+    def mtu(self) -> int | None:
+        return self._client.mtu_size if self.connected else None
+
     def _on_disconnect(self, _client: BleakClientWithServiceCache) -> None:
         _LOGGER.debug("%s: disconnected", self._name)
         self._client = None
@@ -63,6 +67,13 @@ class PixelClockClient:
         except Exception:
             await client.disconnect()
             raise
+        # BlueZ reports the default MTU (23) until it is acquired; the panel supports 517
+        backend = getattr(client, "_backend", None)
+        if (acquire := getattr(backend, "_acquire_mtu", None)) is not None:
+            try:
+                await acquire()
+            except Exception as err:  # noqa: BLE001 - small writes still work
+                _LOGGER.debug("%s: MTU not acquired: %s", self._name, err)
         self._client = client
         _LOGGER.debug("%s: connected, MTU %s", self._name, client.mtu_size)
         # The time command also returns the device info (panel type and size).
@@ -135,7 +146,7 @@ class PixelClockClient:
                         # data may have been dropped: use acknowledged writes from now on
                         _LOGGER.warning("%s: no ACK after a fast upload, switching to acknowledged writes", self._name)
                         self.fast_writes = False
-                    raise TimeoutError(f"{self._name}: no ACK for image window {index + 1}/{len(windows)}")
+                    raise TimeoutError(f"no ACK for image window {index + 1}/{len(windows)}")
             _LOGGER.debug("%s: sent %s bytes (%s, fast=%s)", self._name, len(data), "gif" if is_gif else "png", fast)
 
     async def async_disconnect(self) -> None:
