@@ -20,7 +20,38 @@ async def async_setup_entry(hass: HomeAssistant, entry: PixelClockConfigEntry,
     async_add_entities([
         AutoRotateSwitch(coordinator, "auto_rotate"),
         *(PageSwitch(coordinator, key, option) for option, key in PAGE_SWITCHES.items()),
+        *(CustomPageSwitch(coordinator, name) for name in coordinator.settings.known_apps),
     ])
+    # pages created later by automations (set_app) get their switch right away
+    coordinator.on_new_app = lambda name: async_add_entities([CustomPageSwitch(coordinator, name)])
+    entry.async_on_unload(lambda: setattr(coordinator, "on_new_app", None))
+
+
+class CustomPageSwitch(PixelClockEntity, SwitchEntity):
+    """Show a page created by an automation (pixel_clock.set_app) on this panel."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator, name: str) -> None:
+        super().__init__(coordinator, "page_custom")
+        self._app = name
+        self._attr_unique_id = f"{coordinator.address}_page_app_{name}"
+        self._attr_translation_placeholders = {"name": name.replace("_", " ").title()}
+
+    @property
+    def is_on(self) -> bool:
+        return self._app not in self.coordinator.settings.hidden_apps
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        # active: the automation currently provides this page (e.g. the washing machine is running)
+        return {"app": self._app, "active": self._app in self.coordinator.settings.custom_apps}
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.coordinator.async_show_app(self._app, True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.coordinator.async_show_app(self._app, False)
 
 
 class PageSwitch(PixelClockEntity, SwitchEntity):

@@ -109,6 +109,9 @@
       },
       "page_calendar": {
         "name": "Page appointments"
+      },
+      "page_custom": {
+        "name": "Page {name}"
       }
     },
     "text": {

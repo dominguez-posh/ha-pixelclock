@@ -7,6 +7,7 @@ import contextlib
 import hashlib
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -110,6 +111,9 @@ class _Settings:
     auto_rotate: bool = True
     app_seconds: int = DEFAULT_APP_SECONDS
     custom_apps: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # every custom page ever set (one switch each on the device page) and the ones switched off
+    known_apps: list[str] = field(default_factory=list)
+    hidden_apps: list[str] = field(default_factory=list)
 
 
 class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
@@ -140,6 +144,7 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         self._icons: dict[str, Image.Image | None] = {}
         self._icon_dir = Path(hass.config.path(".storage", f"{DOMAIN}_icons"))
         self._unsub_states: CALLBACK_TYPE | None = None
+        self.on_new_app: Callable[[str], None] | None = None  # set by the switch platform
         self._last_upload = 0.0
 
     # ---- lifecycle -------------------------------------------------------------------------
@@ -148,6 +153,9 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         if data := await self._store.async_load():
             known = _Settings.__dataclass_fields__
             self.settings = _Settings(**{k: v for k, v in data.items() if k in known})
+        for name in self.settings.custom_apps:  # pages set before switches existed
+            if name not in self.settings.known_apps:
+                self.settings.known_apps.append(name)
         self.async_track_entities()
         self._task = self.config_entry.async_create_background_task(
             self.hass, self._run(), f"{DOMAIN} display {self.address}"
@@ -392,7 +400,8 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
             if (expires := app.get("expires")) and dt_util.parse_datetime(expires) < now:
                 del self.settings.custom_apps[name]
                 continue
-            names.append(f"app:{name}")
+            if name not in self.settings.hidden_apps:
+                names.append(f"app:{name}")
         return names or [APP_CLOCK]
 
     def _usable(self, entity_id: str | None) -> bool:
@@ -662,13 +671,33 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         if lifetime:
             spec["expires"] = (dt_util.utcnow() + timedelta(seconds=lifetime)).isoformat()
         self.settings.custom_apps[name] = spec
+        new = name not in self.settings.known_apps
+        if new:
+            self.settings.known_apps.append(name)
         await self._save()
+        if new and self.on_new_app is not None:
+            self.on_new_app(name)
+        self.async_update_listeners()
         if self.data.current_app == f"app:{name}":
             self.wake()
+
+    async def async_show_app(self, name: str, show: bool) -> None:
+        """Switch a custom page on or off for this panel (the automation keeps updating it)."""
+        hidden = set(self.settings.hidden_apps)
+        if show:
+            hidden.discard(name)
+        else:
+            hidden.add(name)
+        self.settings.hidden_apps = sorted(hidden)
+        await self._save()
+        self.async_update_listeners()
+        if not show and self.data.current_app == f"app:{name}":
+            self.next_app()
 
     async def async_remove_app(self, name: str) -> None:
         if self.settings.custom_apps.pop(name, None) is not None:
             await self._save()
+            self.async_update_listeners()
             self.wake()
 
 

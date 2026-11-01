@@ -109,6 +109,9 @@
       },
       "page_calendar": {
         "name": "Seite Termine"
+      },
+      "page_custom": {
+        "name": "Seite {name}"
       }
     },
     "text": {
