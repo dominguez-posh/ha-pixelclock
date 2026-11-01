@@ -30,6 +30,7 @@ class PixelClockClient:
         self._ack: asyncio.Queue[int] = asyncio.Queue()
         self._info: asyncio.Future[bytes] | None = None
         self.device_info: proto.DeviceInfo | None = None
+        self.fast_writes = True
 
     @property
     def connected(self) -> bool:
@@ -84,10 +85,11 @@ class PixelClockClient:
                 return True
         return False
 
-    async def _write(self, client: BleakClientWithServiceCache, data: bytes) -> None:
+    async def _write(self, client: BleakClientWithServiceCache, data: bytes, fast: bool = False) -> None:
+        """fast: write without response (measured 10x faster); the panel's window ACK is the check."""
         size = max(20, min(proto.MAX_CHUNK, client.mtu_size - 3))
         for chunk in proto.chunks(data, size):
-            await client.write_gatt_char(proto.WRITE_UUID, chunk, response=True)
+            await client.write_gatt_char(proto.WRITE_UUID, chunk, response=not fast)
 
     async def _command(self, client: BleakClientWithServiceCache, data: bytes) -> None:
         self._drain_acks()
@@ -123,16 +125,18 @@ class PixelClockClient:
         """Upload a PNG or GIF and show it (not stored on the panel)."""
         async with self._lock:
             client = await self._ensure_connected(ble_device)
+            fast = self.fast_writes
             windows = proto.image_windows(data, is_gif)
             self._drain_acks()
             for index, window in enumerate(windows):
-                await self._write(client, window)
-                last = index == len(windows) - 1
+                await self._write(client, window, fast)
                 if not await self._wait_ack(ACK_TIMEOUT, proto.ACK_WINDOW + (proto.ACK_DONE,)):
-                    if not last:
-                        raise TimeoutError(f"{self._name}: no ACK for image window {index + 1}/{len(windows)}")
-                    _LOGGER.debug("%s: no ACK for the last image window", self._name)
-            _LOGGER.debug("%s: sent %s bytes (%s)", self._name, len(data), "gif" if is_gif else "png")
+                    if fast:
+                        # data may have been dropped: use acknowledged writes from now on
+                        _LOGGER.warning("%s: no ACK after a fast upload, switching to acknowledged writes", self._name)
+                        self.fast_writes = False
+                    raise TimeoutError(f"{self._name}: no ACK for image window {index + 1}/{len(windows)}")
+            _LOGGER.debug("%s: sent %s bytes (%s, fast=%s)", self._name, len(data), "gif" if is_gif else "png", fast)
 
     async def async_disconnect(self) -> None:
         async with self._lock:

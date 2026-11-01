@@ -21,7 +21,7 @@ MANUFACTURER_ID = 0x5254  # "TR"
 
 # Images are sent in windows of 12 KiB; the panel acknowledges each window.
 WINDOW_SIZE = 12 * 1024
-MAX_CHUNK = 244  # bytes per GATT write, limited further by the negotiated MTU
+MAX_CHUNK = 509  # bytes per GATT write, limited further by the negotiated MTU (panel: 517)
 
 # ACK notification: 05 00 <cmd> <type> <status>; status 0/1 = window received, 3 = transfer complete
 ACK_WINDOW = (0, 1)
