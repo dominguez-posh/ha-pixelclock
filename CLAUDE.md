@@ -27,6 +27,13 @@ Home Assistant custom integration `pixel_clock` for iPixel Color BLE LED panels 
   `/pixel-clock` (created by script via lovelace/config/save).
 - README images come from `tools/docs_images.py`; Action article: action.com/de-de/p/3226274.
 
+- Fast uploads over the Pi's BlueZ lost data in 12 KB windows (also with an 8 ms pause per chunk);
+  fixed with an acknowledged write every 8th chunk + last chunk of each window, and an in-place
+  retry with acknowledged writes. Verified 2026-11-01: 3 notifications of ~40 KB (4 windows) in a
+  row, each on screen after ~2.5 s, fast writes stayed on. Preview (image entity) is built in a
+  background task after the upload (it delayed the state by seconds on the Pi).
+- The panel has no sensors: info response bytes 5/6 count up like an uptime (mm:ss), rhythm mode
+  gets its levels from the phone's microphone, the app's temperature is internet weather.
 - USB of the panel is power only (2026-11-01: plugged into the laptop with the original cable,
   no new PnP device at all). Control is BLE only.
 - Page settings live in the entry options; the device page has switches/selects writing the same
