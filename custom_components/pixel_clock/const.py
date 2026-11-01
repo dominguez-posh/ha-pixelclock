@@ -7,26 +7,52 @@ DOMAIN = "pixel_clock"
 CONF_WIDTH = "width"
 CONF_HEIGHT = "height"
 
-# Options: built-in apps
+# Options (version 1 kept the built-in pages here; migrated to app subentries in version 2)
 CONF_SHOW_CLOCK = "show_clock"
 CONF_SHOW_DATE = "show_date"
 CONF_SHOW_WEATHER = "show_weather"
 CONF_SHOW_POWER = "show_power"
 CONF_SHOW_CALENDAR = "show_calendar"
-# page switches on the device page: option key -> translation key of the switch
-PAGE_SWITCHES = {
-    CONF_SHOW_CLOCK: "page_clock",
-    CONF_SHOW_DATE: "page_date",
-    CONF_SHOW_WEATHER: "page_weather",
-    CONF_SHOW_POWER: "page_power",
-    CONF_SHOW_CALENDAR: "page_calendar",
-}
 CONF_WEATHER = "weather_entity"
 CONF_POWER = "power_entity"
 CONF_CALENDARS = "calendar_entities"
 CONF_SENSORS = "sensor_entities"
 CONF_CALENDAR_DAYS = "calendar_days"
-CONF_COLOR = "color"
+CONF_COLOR = "color"  # default text colour (still an option)
+CONF_DEFAULT_APPS = "default_apps"  # entry data: initial apps were created
+
+# Apps: one config subentry of type "app" per page on the panel
+SUBENTRY_APP = "app"
+APP_PREFIX = "sub:"  # app key in the rotation: sub:<subentry id>
+T_CLOCK, T_DATE, T_WEATHER, T_VALUE, T_POWER, T_STATUS, T_TEXT, T_CALENDAR = (
+    "clock", "date", "weather", "value", "power", "status", "text", "calendar",
+)
+APP_TYPES = (T_CLOCK, T_DATE, T_WEATHER, T_VALUE, T_POWER, T_STATUS, T_TEXT, T_CALENDAR)
+# subentry data keys
+A_TYPE = "type"
+A_ENABLED = "enabled"
+A_ICON = "icon"
+A_COLOR = "color"
+A_EFFECT = "effect"
+A_ENTITY = "entity"
+A_SECONDS = "seconds"
+A_WEEKDAY_BAR = "weekday_bar"
+A_LABEL = "label"
+A_UNIT = "unit"
+A_DECIMALS = "decimals"
+A_PROGRESS = "progress"
+A_MIN = "min"
+A_MAX = "max"
+A_ACTIVE_STATES = "active_states"
+A_ABOVE = "above"
+A_OFF_DELAY = "off_delay"
+A_TEXT = "text"
+A_DONE_TEXT = "done_text"
+A_PROGRESS_ENTITY = "progress_entity"
+A_CALENDARS = "calendars"
+A_DAYS = "days"
+ICON_AUTO = "auto"
+ICON_NONE = "none"
 
 DEFAULT_CALENDAR_DAYS = 3
 

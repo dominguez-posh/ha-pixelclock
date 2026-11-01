@@ -1,15 +1,16 @@
-"""Switch entity: rotate through the apps automatically."""
+"""Switch entities: rotate through the apps, one switch per app (shown on this panel or not)."""
 
 from __future__ import annotations
 
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
+from homeassistant.config_entries import ConfigSubentry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import PAGE_SWITCHES
+from .const import A_ENABLED
 from .coordinator import PixelClockConfigEntry
 from .entity import PixelClockEntity
 
@@ -19,12 +20,46 @@ async def async_setup_entry(hass: HomeAssistant, entry: PixelClockConfigEntry,
     coordinator = entry.runtime_data
     async_add_entities([
         AutoRotateSwitch(coordinator, "auto_rotate"),
-        *(PageSwitch(coordinator, key, option) for option, key in PAGE_SWITCHES.items()),
         *(CustomPageSwitch(coordinator, name) for name in coordinator.settings.known_apps),
     ])
+    # one switch per app, listed under the app (subentry) on the integration page
+    for subentry in coordinator.apps.values():
+        async_add_entities([AppSwitch(coordinator, subentry)], config_subentry_id=subentry.subentry_id)
     # pages created later by automations (set_app) get their switch right away
     coordinator.on_new_app = lambda name: async_add_entities([CustomPageSwitch(coordinator, name)])
     entry.async_on_unload(lambda: setattr(coordinator, "on_new_app", None))
+
+
+class AppSwitch(PixelClockEntity, SwitchEntity):
+    """Show an app (configured as a subentry) on this panel."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator, subentry: ConfigSubentry) -> None:
+        super().__init__(coordinator, "app")
+        self._subentry_id = subentry.subentry_id
+        self._attr_unique_id = f"{coordinator.address}_app_{subentry.subentry_id}"
+        self._attr_translation_placeholders = {"name": subentry.title}
+
+    @property
+    def _subentry(self) -> ConfigSubentry | None:
+        return self.coordinator.config_entry.subentries.get(self._subentry_id)
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self._subentry and self._subentry.data.get(A_ENABLED, True))
+
+    def _set(self, enabled: bool) -> None:
+        if (subentry := self._subentry) is not None:
+            self.hass.config_entries.async_update_subentry(
+                self.coordinator.config_entry, subentry, data={**subentry.data, A_ENABLED: enabled}
+            )
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        self._set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        self._set(False)
 
 
 class CustomPageSwitch(PixelClockEntity, SwitchEntity):
@@ -52,26 +87,6 @@ class CustomPageSwitch(PixelClockEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.coordinator.async_show_app(self._app, False)
-
-
-class PageSwitch(PixelClockEntity, SwitchEntity):
-    """Show a built-in page (clock, date, weather, power, appointments) on this panel."""
-
-    _attr_entity_category = EntityCategory.CONFIG
-
-    def __init__(self, coordinator, key: str, option: str) -> None:
-        super().__init__(coordinator, key)
-        self._option = option
-
-    @property
-    def is_on(self) -> bool:
-        return self.coordinator.options.get(self._option, True)
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        self.coordinator.async_set_option(self._option, True)
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        self.coordinator.async_set_option(self._option, False)
 
 
 class AutoRotateSwitch(PixelClockEntity, SwitchEntity):

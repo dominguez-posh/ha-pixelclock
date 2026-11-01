@@ -36,7 +36,7 @@ def test_short_text_is_big_and_still():
 
 def test_long_text_scrolls_and_stays_in_text_area():
     r = render.render_screen(Screen([Line("Waschmaschine ist fertig")], icon=icons.builtin_icon("bell")), W, H)
-    assert r.animated and r.cycle_ms > 0
+    assert r.animated and r.scroll_ms > 0
     icon_area = {p for p in lit(r.frames[0]) if p[0] < H}
     for frame in r.frames[::10]:
         assert {p for p in lit(frame) if p[0] < H} == icon_area  # text never draws over the icon

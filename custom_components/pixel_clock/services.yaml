@@ -31,6 +31,11 @@ notify:
           max: 100
           unit_of_measurement: "%"
     progress_color: *color
+    effect: &effect
+      selector:
+        select:
+          translation_key: effect
+          options: [none, rainbow, matrix, twinkle, fire, plasma, snow, rain, pulse]
 
 set_app:
   fields:
@@ -50,6 +55,7 @@ set_app:
     color: *color
     progress: *progress
     progress_color: *color
+    effect: *effect
     lifetime:
       selector:
         number:

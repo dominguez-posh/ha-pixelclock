@@ -7,7 +7,7 @@ import contextlib
 import hashlib
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -16,7 +16,7 @@ from typing import Any
 from bleak.backends.device import BLEDevice
 from bleak.exc import BleakError
 from homeassistant.components import bluetooth
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -31,33 +31,53 @@ from PIL import Image
 from . import icons, render
 from . import protocol as proto
 from .const import (
-    APP_CALENDAR,
+    A_ABOVE,
+    A_ACTIVE_STATES,
+    A_CALENDARS,
+    A_COLOR,
+    A_DAYS,
+    A_DECIMALS,
+    A_DONE_TEXT,
+    A_EFFECT,
+    A_ENABLED,
+    A_ENTITY,
+    A_ICON,
+    A_LABEL,
+    A_MAX,
+    A_MIN,
+    A_OFF_DELAY,
+    A_PROGRESS,
+    A_PROGRESS_ENTITY,
+    A_SECONDS,
+    A_TEXT,
+    A_TYPE,
+    A_UNIT,
+    A_WEEKDAY_BAR,
     APP_CLOCK,
-    APP_DATE,
-    APP_POWER,
-    APP_WEATHER,
+    APP_PREFIX,
     CALENDAR_REFRESH,
-    CONF_CALENDAR_DAYS,
-    CONF_CALENDARS,
     CONF_COLOR,
     CONF_HEIGHT,
-    CONF_POWER,
-    CONF_SENSORS,
-    CONF_SHOW_CALENDAR,
-    CONF_SHOW_CLOCK,
-    CONF_SHOW_DATE,
-    CONF_SHOW_POWER,
-    CONF_SHOW_WEATHER,
-    CONF_WEATHER,
     CONF_WIDTH,
     DEFAULT_APP_SECONDS,
     DEFAULT_BRIGHTNESS,
     DEFAULT_CALENDAR_DAYS,
     DEFAULT_NOTIFY_SECONDS,
     DOMAIN,
+    ICON_AUTO,
+    ICON_NONE,
     MODE_APPS,
     MODE_CLOCK,
     RETRY_SECONDS,
+    SUBENTRY_APP,
+    T_CALENDAR,
+    T_CLOCK,
+    T_DATE,
+    T_POWER,
+    T_STATUS,
+    T_TEXT,
+    T_VALUE,
+    T_WEATHER,
     TIME_SYNC_INTERVAL,
     TODAY,
     TOMORROW,
@@ -84,6 +104,7 @@ class Notification:
     duration: float | None = None
     progress: float | None = None
     progress_color: Any = None
+    effect: str | None = None
 
 
 @dataclass
@@ -139,12 +160,14 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         self._native_clock_shown = False
         self._settings_applied = False
         self._last_time_sync: datetime | None = None
-        self._calendar_events: list[dict[str, Any]] = []
-        self._calendar_fetched: datetime | None = None
+        self._calendar_cache: dict[tuple[tuple[str, ...], int], tuple[datetime | None, list[dict[str, Any]]]] = {}
+        self._status: dict[str, dict[str, Any]] = {}
+        self._entity_apps: dict[str, set[str]] = {}
         self._icons: dict[str, Image.Image | None] = {}
         self._icon_dir = Path(hass.config.path(".storage", f"{DOMAIN}_icons"))
         self._unsub_states: CALLBACK_TYPE | None = None
         self.on_new_app: Callable[[str], None] | None = None  # set by the switch platform
+        self.loaded_apps: set[str] = set()  # app subentry ids the entities were created for
         self._last_upload = 0.0
         self._preview_seq = 0
 
@@ -180,35 +203,26 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         self._wake.set()
 
     @callback
-    def async_set_option(self, key: str, value: Any) -> None:
-        """Change one page option from an entity on the device page (same storage as the options flow)."""
-        options = {**self.options}
-        if value is None:
-            options.pop(key, None)
-        else:
-            options[key] = value
-        self.hass.config_entries.async_update_entry(self.config_entry, options=options)
-
-    @callback
     def async_track_entities(self) -> None:
-        """Listen to the entities of the built-in pages, so a page on screen shows live values."""
+        """Listen to the entities the apps show, so the app on screen follows them live."""
         if self._unsub_states:
             self._unsub_states()
             self._unsub_states = None
-        entities = [e for e in (self.options.get(CONF_POWER), self.options.get(CONF_WEATHER)) if e]
-        entities += self.options.get(CONF_SENSORS, [])
-        if entities:
-            self._unsub_states = async_track_state_change_event(self.hass, entities, self._on_state_change)
+        self._entity_apps = {}
+        for sid, sub in self.apps.items():
+            for key in (A_ENTITY, A_PROGRESS_ENTITY):
+                if entity := sub.data.get(key):
+                    self._entity_apps.setdefault(entity, set()).add(f"{APP_PREFIX}{sid}")
+        if self._entity_apps:
+            self._unsub_states = async_track_state_change_event(
+                self.hass, list(self._entity_apps), self._on_state_change
+            )
+        self._evaluate_status()
 
     @callback
     def _on_state_change(self, event: Event[EventStateChangedData]) -> None:
-        entity_id = event.data["entity_id"]
-        pages = {f"sensor:{entity_id}"}
-        if entity_id == self.options.get(CONF_POWER):
-            pages.add(APP_POWER)
-        if entity_id == self.options.get(CONF_WEATHER):
-            pages.add(APP_WEATHER)
-        if self.data.current_app in pages:
+        self._evaluate_status()
+        if self.data.current_app in self._entity_apps.get(event.data["entity_id"], ()):
             self.wake()
 
     @property
@@ -281,8 +295,8 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
             await self.client.async_command(self._ble_device(), proto.set_brightness(self.settings.brightness))
             self._settings_applied = True
         self._set_available(True)
-        if self.options.get(CONF_CALENDARS):
-            await self._refresh_calendar()
+        self._evaluate_status()
+        await self._refresh_calendars()
 
         if self._notifications:
             await self._show_notification(self._notifications[0])
@@ -316,10 +330,11 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
 
     async def _show_notification(self, note: Notification) -> None:
         screen = await self._screen_for(
-            note.text, note.icon, note.color, note.progress, note.progress_color, default_icon="bell"
+            note.text, note.icon, note.color, note.progress, note.progress_color, default_icon="bell",
+            effect=note.effect,
         )
         rendered = await self._send(f"notify:{id(note)}", screen)
-        seconds = note.duration or max(DEFAULT_NOTIFY_SECONDS, rendered.cycle_ms / 1000)
+        seconds = note.duration or max(DEFAULT_NOTIFY_SECONDS, rendered.scroll_ms / 1000)
         self._publish("notification")
         end = time.monotonic() + seconds
         self._dismiss = False
@@ -346,7 +361,7 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         rendered = await self._send(current, await self._build(current))
         if self._app_until == 0:
             # counted from the end of the upload, which can take seconds for scrolling text
-            seconds = max(self.settings.app_seconds, rendered.cycle_ms / 1000)
+            seconds = max(self.settings.app_seconds, rendered.scroll_ms / 1000)
             self._app_until = time.monotonic() + seconds
         self._publish(current)
 
@@ -393,21 +408,18 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         self.async_set_updated_data(self.data)
 
     # ---- apps --------------------------------------------------------------------------------
+    # Apps are config subentries of the panel's entry (type "app"); pages set by automations
+    # through pixel_clock.set_app are kept in settings.custom_apps.
+
+    @property
+    def apps(self) -> dict[str, ConfigSubentry]:
+        return {sid: sub for sid, sub in self.config_entry.subentries.items() if sub.subentry_type == SUBENTRY_APP}
 
     def _app_names(self) -> list[str]:
-        names: list[str] = []
-        opts = self.options
-        if opts.get(CONF_SHOW_CLOCK, True):
-            names.append(APP_CLOCK)
-        if opts.get(CONF_SHOW_DATE, True):
-            names.append(APP_DATE)
-        if opts.get(CONF_SHOW_WEATHER, True) and self._usable(opts.get(CONF_WEATHER)):
-            names.append(APP_WEATHER)
-        if opts.get(CONF_SHOW_POWER, True) and self._usable(opts.get(CONF_POWER)):
-            names.append(APP_POWER)
-        if opts.get(CONF_SHOW_CALENDAR, True) and opts.get(CONF_CALENDARS) and self._next_event():
-            names.append(APP_CALENDAR)
-        names.extend(f"sensor:{e}" for e in opts.get(CONF_SENSORS, []) if self._usable(e))
+        names = [
+            f"{APP_PREFIX}{sid}" for sid, sub in self.apps.items()
+            if sub.data.get(A_ENABLED, True) and self._app_available(sid, sub.data)
+        ]
         now = dt_util.utcnow()
         for name, app in list(self.settings.custom_apps.items()):
             if (expires := app.get("expires")) and dt_util.parse_datetime(expires) < now:
@@ -416,6 +428,16 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
             if name not in self.settings.hidden_apps:
                 names.append(f"app:{name}")
         return names or [APP_CLOCK]
+
+    def _app_available(self, sid: str, data: Mapping[str, Any]) -> bool:
+        kind = data.get(A_TYPE)
+        if kind in (T_WEATHER, T_VALUE, T_POWER):
+            return self._usable(data.get(A_ENTITY))
+        if kind == T_STATUS:
+            return self._status.get(sid, {}).get("active", False)
+        if kind == T_CALENDAR:
+            return self._next_event(data) is not None
+        return True
 
     def _usable(self, entity_id: str | None) -> bool:
         if not entity_id:
@@ -427,43 +449,138 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
     def app_names(self) -> list[str]:
         return self._app_names()
 
+    def app_title(self, key: str | None) -> str | None:
+        """Readable name of an app key for the current-app sensor."""
+        if key and key.startswith(APP_PREFIX) and (sub := self.apps.get(key.removeprefix(APP_PREFIX))):
+            return sub.title
+        return key.removeprefix("app:") if key else key
+
     def _color(self) -> render.RGB:
         return render.parse_color(self.options.get(CONF_COLOR))
 
+    # status apps: active while the entity is in one of the states or above a value, kept for
+    # off_delay minutes after it stops (washing machines pause); done_text is shown when it ends
+
+    @callback
+    def _evaluate_status(self) -> None:
+        mono = time.monotonic()
+        for sid, sub in self.apps.items():
+            data = sub.data
+            if data.get(A_TYPE) != T_STATUS:
+                continue
+            rec = self._status.setdefault(sid, {"active": False, "last": 0.0})
+            if self._status_now(data):
+                rec["last"] = mono
+                active = True
+            else:
+                active = rec["active"] and mono - rec["last"] < float(data.get(A_OFF_DELAY, 0)) * 60
+            if rec["active"] and not active and data.get(A_DONE_TEXT) and data.get(A_ENABLED, True):
+                self.notify(Notification(text=self._template(data[A_DONE_TEXT]), icon=data.get(A_ICON) or "check",
+                                         color=[0, 200, 60], duration=30, effect=data.get(A_EFFECT)))
+            rec["active"] = active
+
+    def _status_now(self, data: Mapping[str, Any]) -> bool:
+        state = self.hass.states.get(data.get(A_ENTITY, ""))
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return False
+        if state.state in (data.get(A_ACTIVE_STATES) or []):
+            return True
+        above = data.get(A_ABOVE)
+        try:
+            return above is not None and float(state.state) > float(above)
+        except ValueError:
+            return False
+
     async def _build(self, app: str) -> Screen | render.Rendered:
         now = dt_util.now()
-        color = self._color()
-        lang = self.language
-        if app == APP_CLOCK:
-            return self._clock(now)
-        if app == APP_DATE:
-            if self.tall:
-                return Screen([Line(WEEKDAYS_SHORT[lang][now.weekday()], color),
-                               Line(now.strftime("%d."), (0, 200, 230)), Line(now.strftime("%m."), (0, 200, 230))])
-            if self.view_size[1] >= 16:
-                return Screen([Line(WEEKDAYS[lang][now.weekday()], color), Line(now.strftime("%d.%m.%Y"), (0, 200, 230))])
-            return Screen([Line(f"{WEEKDAYS_SHORT[lang][now.weekday()]} {now.strftime('%d.%m.')}", color)])
-        if app == APP_WEATHER:
-            state = self.hass.states.get(self.options[CONF_WEATHER])
-            temp = state.attributes.get("temperature")
-            text = f"{self._number(temp, 0)}°" if temp is not None else state.state
-            icon = icons.builtin_icon(icons.WEATHER_ICONS.get(state.state, "cloud"))
-            return Screen([Line(text, color)], icon=icon)
-        if app == APP_POWER:
-            return self._power_screen(self.options[CONF_POWER])
-        if app == APP_CALENDAR:
-            return await self._calendar_screen(now)
-        if app.startswith("sensor:"):
-            return self._sensor_screen(app.removeprefix("sensor:"))
+        if app.startswith(APP_PREFIX) and (sub := self.apps.get(app.removeprefix(APP_PREFIX))):
+            return await self._build_app(sub.data, sub.title, now)
         if app.startswith("app:"):
             spec = self.settings.custom_apps.get(app.removeprefix("app:"))
-            if spec is None:
-                return self._clock(now)
-            text = self._template(spec.get("text", ""))
-            return await self._screen_for(
-                text, spec.get("icon"), spec.get("color"), spec.get("progress"), spec.get("progress_color")
-            )
+            if spec is not None:
+                text = self._template(spec.get("text", ""))
+                return await self._screen_for(
+                    text, spec.get("icon"), spec.get("color"), spec.get("progress"), spec.get("progress_color"),
+                    effect=spec.get("effect"),
+                )
         return self._clock(now)
+
+    async def _icon(self, spec: str | None, auto: str | None) -> Image.Image | None:
+        if not spec or spec == ICON_AUTO:
+            return icons.builtin_icon(auto) if auto else None
+        if spec == ICON_NONE:
+            return None
+        return await self.async_icon(spec)
+
+    async def _build_app(self, data: Mapping[str, Any], title: str, now: datetime) -> Screen | render.Rendered:
+        kind = data.get(A_TYPE)
+        color = render.parse_color(data.get(A_COLOR), self._color())
+        effect = data.get(A_EFFECT) or "none"
+        lang = self.language
+        if kind == T_CLOCK:
+            return render.render_clock(
+                now, *self.view_size, color, weekdays=WEEKDAYS_SHORT[lang], effect=effect,
+                seconds=data.get(A_SECONDS, True), weekday_bar=data.get(A_WEEKDAY_BAR, True),
+            )
+        icon_spec = data.get(A_ICON)
+        if kind == T_DATE:
+            cyan = (0, 200, 230)
+            if self.tall:
+                lines = [Line(WEEKDAYS_SHORT[lang][now.weekday()], color), Line(now.strftime("%d."), cyan),
+                         Line(now.strftime("%m."), cyan)]
+            elif self.view_size[1] >= 16:
+                lines = [Line(WEEKDAYS[lang][now.weekday()], color), Line(now.strftime("%d.%m.%Y"), cyan)]
+            else:
+                lines = [Line(f"{WEEKDAYS_SHORT[lang][now.weekday()]} {now.strftime('%d.%m.')}", color)]
+            return Screen(lines, icon=await self._icon(icon_spec, None), effect=effect)
+        if kind == T_WEATHER:
+            state = self.hass.states.get(data[A_ENTITY])
+            temp = state.attributes.get("temperature")
+            text = f"{self._number(temp, 0)}°" if temp is not None else state.state
+            icon = await self._icon(icon_spec, icons.WEATHER_ICONS.get(state.state, "cloud"))
+            return Screen([Line(text, color)], icon=icon, effect=effect)
+        if kind == T_VALUE:
+            return await self._value_screen(data, color, effect)
+        if kind == T_POWER:
+            screen = self._power_screen(data[A_ENTITY])
+            if icon_spec and icon_spec != ICON_AUTO:
+                screen.icon = await self._icon(icon_spec, None)
+            screen.effect = effect
+            return screen
+        if kind == T_STATUS:
+            progress = None
+            if (entity := data.get(A_PROGRESS_ENTITY)) and self._usable(entity):
+                with contextlib.suppress(ValueError):
+                    progress = float(self.hass.states.get(entity).state)
+            return await self._screen_for(self._template(data.get(A_TEXT) or title), icon_spec,
+                                          data.get(A_COLOR), progress, default_icon="info", effect=effect)
+        if kind == T_TEXT:
+            return await self._screen_for(self._template(data.get(A_TEXT, "")), icon_spec, data.get(A_COLOR),
+                                          effect=effect)
+        if kind == T_CALENDAR:
+            screen = await self._calendar_screen(data, now, color)
+            if icon_spec and icon_spec != ICON_AUTO:
+                screen.icon = await self._icon(icon_spec, None)
+            screen.effect = effect
+            return screen
+        return self._clock(now)
+
+    async def _value_screen(self, data: Mapping[str, Any], color: render.RGB, effect: str) -> Screen:
+        state = self.hass.states.get(data[A_ENTITY])
+        unit = data.get(A_UNIT) or state.attributes.get("unit_of_measurement") or ""
+        decimals = data.get(A_DECIMALS)
+        value = self._number(state.state, None if decimals is None else int(decimals))
+        text = f"{value}{'' if unit in ('%', '°C', '°F', '°', '') else ' '}{unit}"
+        if label := data.get(A_LABEL):
+            text = f"{label} {text}"
+        progress = None
+        if data.get(A_PROGRESS):
+            lo, hi = float(data.get(A_MIN, 0)), float(data.get(A_MAX, 100))
+            with contextlib.suppress(ValueError, ZeroDivisionError):
+                progress = (float(state.state) - lo) / (hi - lo) * 100
+        auto = icons.DEVICE_CLASS_ICONS.get(state.attributes.get("device_class", ""), "info")
+        return Screen([Line(text, color)], icon=await self._icon(data.get(A_ICON), auto), progress=progress,
+                      effect=effect)
 
     @property
     def view_size(self) -> tuple[int, int]:
@@ -476,7 +593,8 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         return height > width
 
     def _clock(self, now: datetime) -> render.Rendered:
-        return render.render_clock(now, *self.view_size, self._color(), weekdays=WEEKDAYS_SHORT[self.language])
+        return render.render_clock(now, *self.view_size, self._color(), weekdays=WEEKDAYS_SHORT[self.language],
+                                   seconds=True)
 
     def _template(self, text: str) -> str:
         if "{" not in text:
@@ -504,10 +622,7 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
             watts = float(state.state) * (1000 if unit == "kW" else 1)
         except ValueError:
             return Screen([Line(state.state)], icon=icons.builtin_icon("power"))
-        if abs(watts) >= 1000:
-            text = f"{self._number(watts / 1000, 1)} kW"
-        else:
-            text = f"{self._number(watts, 0)} W"
+        text = f"{self._number(watts / 1000, 1)} kW" if abs(watts) >= 1000 else f"{self._number(watts, 0)} W"
         if watts < 0:
             color, icon = (0, 200, 60), "solar"  # feeding in
         elif watts < 1000:
@@ -518,54 +633,49 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
             color, icon = (255, 40, 20), "power"
         return Screen([Line(text, color)], icon=icons.builtin_icon(icon))
 
-    def _sensor_screen(self, entity_id: str) -> Screen:
-        state = self.hass.states.get(entity_id)
-        unit = state.attributes.get("unit_of_measurement") or ""
-        text = f"{self._number(state.state)}{'' if unit in ('%', '°C', '°F', '') else ' '}{unit}"
-        icon_name = state.attributes.get("icon", "")
-        icon = icons.DEVICE_CLASS_ICONS.get(state.attributes.get("device_class", ""), "house")
-        if "solar" in icon_name:
-            icon = "solar"
-        return Screen([Line(text, self._color())], icon=icons.builtin_icon(icon))
-
     # ---- calendar ----------------------------------------------------------------------------
 
-    def _calendar_due(self) -> bool:
-        return self._calendar_fetched is None or dt_util.utcnow() - self._calendar_fetched > CALENDAR_REFRESH
+    @staticmethod
+    def _calendar_key(data: Mapping[str, Any]) -> tuple[tuple[str, ...], int]:
+        return tuple(data.get(A_CALENDARS) or []), int(data.get(A_DAYS, DEFAULT_CALENDAR_DAYS))
 
-    async def _refresh_calendar(self) -> None:
-        if not self._calendar_due():
-            return
-        self._calendar_fetched = dt_util.utcnow()
-        calendars = self.options.get(CONF_CALENDARS, [])
-        days = int(self.options.get(CONF_CALENDAR_DAYS, DEFAULT_CALENDAR_DAYS))
-        try:
-            result = await self.hass.services.async_call(
-                "calendar", "get_events",
-                {"entity_id": calendars, "duration": {"days": days}},
-                blocking=True, return_response=True,
-            )
-        except HomeAssistantError as err:
-            _LOGGER.warning("%s: reading calendars failed: %s", self.name, err)
-            return
-        events = [ev for cal in (result or {}).values() for ev in cal.get("events", [])]
-        for ev in events:
-            ev["_start"] = _event_time(ev["start"])
-            ev["_end"] = _event_time(ev["end"])
-        self._calendar_events = sorted(events, key=lambda ev: ev["_start"])
+    async def _refresh_calendars(self) -> None:
+        keys = {self._calendar_key(sub.data) for sub in self.apps.values() if sub.data.get(A_TYPE) == T_CALENDAR}
+        now = dt_util.utcnow()
+        for key in keys:
+            calendars, days = key
+            fetched, _ = self._calendar_cache.get(key, (None, []))
+            if not calendars or (fetched is not None and now - fetched < CALENDAR_REFRESH):
+                continue
+            try:
+                result = await self.hass.services.async_call(
+                    "calendar", "get_events",
+                    {"entity_id": list(calendars), "duration": {"days": days}},
+                    blocking=True, return_response=True,
+                )
+            except HomeAssistantError as err:
+                _LOGGER.warning("%s: reading calendars failed: %s", self.name, err)
+                self._calendar_cache[key] = (now, [])
+                continue
+            events = [ev for cal in (result or {}).values() for ev in cal.get("events", [])]
+            for ev in events:
+                ev["_start"] = _event_time(ev["start"])
+                ev["_end"] = _event_time(ev["end"])
+            self._calendar_cache[key] = (now, sorted(events, key=lambda ev: ev["_start"]))
 
-    def _next_event(self) -> dict[str, Any] | None:
+    def _next_event(self, data: Mapping[str, Any]) -> dict[str, Any] | None:
         now = dt_util.now()
-        for ev in self._calendar_events:
+        _, events = self._calendar_cache.get(self._calendar_key(data), (None, []))
+        for ev in events:
             if ev["_end"] > now:
                 return ev
         return None
 
-    async def _calendar_screen(self, now: datetime) -> Screen:
-        ev = self._next_event()
+    async def _calendar_screen(self, data: Mapping[str, Any], now: datetime, color: render.RGB) -> Screen:
+        ev = self._next_event(data)
         icon = icons.builtin_icon("calendar")
         if ev is None:
-            return Screen([Line("–", self._color())], icon=icon)
+            return Screen([Line("–", color)], icon=icon)
         lang = self.language
         start: datetime = ev["_start"]
         all_day = "T" not in ev["start"]
@@ -578,20 +688,25 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
             when = WEEKDAYS_SHORT[lang][start.weekday()] + (start.strftime(" %d.%m.") if all_day else start.strftime(" %H:%M"))
         summary = ev.get("summary") or ""
         if self.view_size[1] >= 16:
-            return Screen([Line(when, (255, 190, 0)), Line(summary, self._color())], icon=icon)
-        return Screen([Line(f"{when} {summary}", self._color())], icon=icon)
+            return Screen([Line(when, (255, 190, 0)), Line(summary, color)], icon=icon)
+        return Screen([Line(f"{when} {summary}", color)], icon=icon)
 
     # ---- icons ------------------------------------------------------------------------------
 
     async def _screen_for(self, text: str, icon: str | None, color: Any, progress: Any = None,
-                          progress_color: Any = None, default_icon: str | None = None) -> Screen:
-        img = await self.async_icon(icon) if icon else (icons.builtin_icon(default_icon) if default_icon else None)
+                          progress_color: Any = None, default_icon: str | None = None,
+                          effect: str | None = None) -> Screen:
+        if not icon or icon == ICON_AUTO:
+            img = icons.builtin_icon(default_icon) if default_icon else None
+        else:
+            img = None if icon == ICON_NONE else await self.async_icon(icon)
         lines = [Line(t, render.parse_color(color, self._color())) for t in str(text).split("\n")]
         return Screen(
             lines,
             icon=img,
             progress=float(progress) if progress not in (None, "") else None,
             progress_color=render.parse_color(progress_color, (0, 200, 60)),
+            effect=effect or "none",
         )
 
     async def async_icon(self, spec: str) -> Image.Image | None:

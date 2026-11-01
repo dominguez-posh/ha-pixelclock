@@ -20,16 +20,10 @@
   "options": {
     "step": {
       "init": {
-        "title": "Apps on the panel",
+        "title": "Panel settings",
+        "description": "Add the pages themselves under the integration with \"Add page\".",
         "data": {
-          "show_clock": "Clock",
-          "show_date": "Date",
-          "weather_entity": "Weather",
-          "power_entity": "Power consumption (W, negative = feed-in)",
-          "calendar_entities": "Calendars (next appointment)",
-          "calendar_days": "Look ahead (days)",
-          "sensor_entities": "Further values (one app each)",
-          "color": "Text colour"
+          "color": "Default text colour"
         }
       }
     }
@@ -72,15 +66,6 @@
           "portrait_right": "Portrait (right end on top)",
           "upside_down": "Landscape, upside down"
         }
-      },
-      "source_weather": {
-        "name": "Weather source"
-      },
-      "source_power": {
-        "name": "Power source"
-      },
-      "source_calendar": {
-        "name": "Appointments source"
       }
     },
     "sensor": {
@@ -95,22 +80,10 @@
       "auto_rotate": {
         "name": "Rotate apps"
       },
-      "page_clock": {
-        "name": "Page clock"
-      },
-      "page_date": {
-        "name": "Page date"
-      },
-      "page_weather": {
-        "name": "Page weather"
-      },
-      "page_power": {
-        "name": "Page power"
-      },
-      "page_calendar": {
-        "name": "Page appointments"
-      },
       "page_custom": {
+        "name": "Page {name}"
+      },
+      "app": {
         "name": "Page {name}"
       }
     },
@@ -157,6 +130,10 @@
         "progress_color": {
           "name": "Progress colour",
           "description": "Colour of the progress bar."
+        },
+        "effect": {
+          "name": "Effect",
+          "description": "Animated background or rainbow text."
         }
       }
     },
@@ -195,6 +172,10 @@
         "lifetime": {
           "name": "Lifetime",
           "description": "Remove the app when it was not updated for this many seconds."
+        },
+        "effect": {
+          "name": "Effect",
+          "description": "Animated background or rainbow text."
         }
       }
     },
@@ -220,6 +201,146 @@
           "name": "Panel",
           "description": "Panels to use (default: all)."
         }
+      }
+    }
+  },
+  "config_subentries": {
+    "app": {
+      "entry_type": "Page",
+      "initiate_flow": {
+        "user": "Add page",
+        "reconfigure": "Edit page"
+      },
+      "step": {
+        "user": {
+          "title": "New page",
+          "description": "What should the page show?",
+          "data": {
+            "type": "Kind of page"
+          }
+        },
+        "app": {
+          "title": "Set up page",
+          "data": {
+            "name": "Name",
+            "icon": "Icon",
+            "color": "Text colour",
+            "effect": "Background effect",
+            "entity": "Entity",
+            "seconds": "Show seconds",
+            "weekday_bar": "Weekday bar",
+            "label": "Text before",
+            "unit": "Unit",
+            "decimals": "Decimals",
+            "progress": "Progress bar",
+            "min": "Bar minimum",
+            "max": "Bar maximum",
+            "active_states": "Active in state",
+            "above": "Active above value",
+            "off_delay": "Hold time",
+            "text": "Text",
+            "progress_entity": "Progress from entity",
+            "done_text": "Message at the end",
+            "calendars": "Calendars",
+            "days": "Look ahead (days)"
+          },
+          "data_description": {
+            "icon": "Built-in icon, LaMetric icon number or image file (/config/www/…).",
+            "color": "Empty = the panel's default text colour.",
+            "label": "Optional, e.g. \"Inside\".",
+            "unit": "Empty = unit of the entity.",
+            "decimals": "Empty = automatic.",
+            "active_states": "The page shows in these states, e.g. on, run, charging.",
+            "above": "Or: the page shows while the value is above, e.g. power > 5 W.",
+            "off_delay": "The page stays this long after the end (washing machine pauses).",
+            "text": "Empty = page name. Templates allowed, e.g. {{ states('sensor.remaining') }} min.",
+            "done_text": "Optional: notification when the status ends, e.g. \"Washing machine done!\"."
+          }
+        }
+      },
+      "error": {
+        "status_condition": "Please set \"Active in state\" or \"Active above value\"."
+      }
+    }
+  },
+  "selector": {
+    "app_type": {
+      "options": {
+        "clock": "Clock",
+        "date": "Date",
+        "weather": "Weather",
+        "value": "Value (temperature, battery, …)",
+        "power": "Power consumption",
+        "status": "Status (e.g. washing machine running)",
+        "text": "Text / template",
+        "calendar": "Appointments"
+      }
+    },
+    "effect": {
+      "options": {
+        "none": "None",
+        "rainbow": "Rainbow text",
+        "matrix": "Matrix",
+        "twinkle": "Twinkling stars",
+        "fire": "Fire",
+        "plasma": "Plasma",
+        "snow": "Snow",
+        "rain": "Rain",
+        "pulse": "Pulse"
+      }
+    },
+    "icon": {
+      "options": {
+        "auto": "Automatic",
+        "none": "No icon",
+        "battery": "Battery",
+        "bed": "Bed",
+        "bell": "Bell",
+        "bulb": "Lamp",
+        "calendar": "Calendar",
+        "car": "Car",
+        "check": "Check",
+        "clock": "Clock",
+        "cloud": "Cloud",
+        "coffee": "Coffee",
+        "dishwasher": "Dishwasher",
+        "door": "Door",
+        "drop": "Drop",
+        "dryer": "Dryer",
+        "euro": "Euro",
+        "ev": "EV charging",
+        "fan": "Fan",
+        "fire": "Fire",
+        "fog": "Fog",
+        "heart": "Heart",
+        "house": "House",
+        "info": "Info",
+        "lock": "Locked",
+        "mail": "Mail",
+        "moon": "Moon",
+        "music": "Music",
+        "partlycloudy": "Partly cloudy",
+        "person": "Person",
+        "plant": "Plant",
+        "plug": "Plug",
+        "power": "Lightning",
+        "radiator": "Radiator",
+        "rain": "Rain",
+        "snow": "Snow",
+        "snowflake": "Snowflake",
+        "solar": "Solar",
+        "star": "Star",
+        "sun": "Sun",
+        "thermometer": "Thermometer",
+        "thunder": "Thunder",
+        "trash": "Bin",
+        "tv": "TV",
+        "unlock": "Unlocked",
+        "warning": "Warning",
+        "washer": "Washing machine",
+        "wifi": "Wi-Fi",
+        "wind": "Wind",
+        "window": "Window"
       }
     }
   }

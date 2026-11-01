@@ -20,12 +20,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: PixelClockConfigEntry,
 class CurrentAppSensor(PixelClockEntity, SensorEntity):
     @property
     def native_value(self) -> str | None:
-        return self.coordinator.data.current_app
+        return self.coordinator.app_title(self.coordinator.data.current_app)
 
     @property
     def extra_state_attributes(self) -> dict:
         return {
-            "apps": self.coordinator.app_names,
+            "app_key": self.coordinator.data.current_app,
+            "apps": [self.coordinator.app_title(key) for key in self.coordinator.app_names],
             "notifications_queued": self.coordinator.data.notifications,
             "custom_apps": list(self.coordinator.settings.custom_apps),
         }

@@ -20,16 +20,10 @@
   "options": {
     "step": {
       "init": {
-        "title": "Apps auf dem Display",
+        "title": "Display-Einstellungen",
+        "description": "Die Seiten selbst richtest du unter der Integration mit „Seite hinzufügen“ ein.",
         "data": {
-          "show_clock": "Uhr",
-          "show_date": "Datum",
-          "weather_entity": "Wetter",
-          "power_entity": "Aktueller Verbrauch (W, negativ = Einspeisung)",
-          "calendar_entities": "Kalender (nächster Termin)",
-          "calendar_days": "Vorschau (Tage)",
-          "sensor_entities": "Weitere Werte (je eine App)",
-          "color": "Textfarbe"
+          "color": "Standard-Textfarbe"
         }
       }
     }
@@ -72,15 +66,6 @@
           "portrait_right": "Hochkant (rechtes Ende oben)",
           "upside_down": "Quer, auf dem Kopf"
         }
-      },
-      "source_weather": {
-        "name": "Quelle Wetter"
-      },
-      "source_power": {
-        "name": "Quelle Verbrauch"
-      },
-      "source_calendar": {
-        "name": "Quelle Termine"
       }
     },
     "sensor": {
@@ -95,22 +80,10 @@
       "auto_rotate": {
         "name": "Apps wechseln"
       },
-      "page_clock": {
-        "name": "Seite Uhr"
-      },
-      "page_date": {
-        "name": "Seite Datum"
-      },
-      "page_weather": {
-        "name": "Seite Wetter"
-      },
-      "page_power": {
-        "name": "Seite Verbrauch"
-      },
-      "page_calendar": {
-        "name": "Seite Termine"
-      },
       "page_custom": {
+        "name": "Seite {name}"
+      },
+      "app": {
         "name": "Seite {name}"
       }
     },
@@ -157,6 +130,10 @@
         "progress_color": {
           "name": "Fortschrittsfarbe",
           "description": "Farbe des Fortschrittsbalkens."
+        },
+        "effect": {
+          "name": "Effekt",
+          "description": "Animierter Hintergrund oder Regenbogen-Text."
         }
       }
     },
@@ -195,6 +172,10 @@
         "lifetime": {
           "name": "Lebensdauer",
           "description": "App entfernen, wenn sie so viele Sekunden nicht aktualisiert wurde."
+        },
+        "effect": {
+          "name": "Effekt",
+          "description": "Animierter Hintergrund oder Regenbogen-Text."
         }
       }
     },
@@ -220,6 +201,146 @@
           "name": "Display",
           "description": "Zu verwendende Displays (Standard: alle)."
         }
+      }
+    }
+  },
+  "config_subentries": {
+    "app": {
+      "entry_type": "Seite",
+      "initiate_flow": {
+        "user": "Seite hinzufügen",
+        "reconfigure": "Seite bearbeiten"
+      },
+      "step": {
+        "user": {
+          "title": "Neue Seite",
+          "description": "Was soll die Seite zeigen?",
+          "data": {
+            "type": "Art der Seite"
+          }
+        },
+        "app": {
+          "title": "Seite einrichten",
+          "data": {
+            "name": "Name",
+            "icon": "Symbol",
+            "color": "Textfarbe",
+            "effect": "Hintergrundeffekt",
+            "entity": "Entität",
+            "seconds": "Sekunden anzeigen",
+            "weekday_bar": "Wochentagsbalken",
+            "label": "Text davor",
+            "unit": "Einheit",
+            "decimals": "Nachkommastellen",
+            "progress": "Fortschrittsbalken",
+            "min": "Balken: Minimum",
+            "max": "Balken: Maximum",
+            "active_states": "Aktiv bei Zustand",
+            "above": "Aktiv über Wert",
+            "off_delay": "Nachlaufzeit",
+            "text": "Text",
+            "progress_entity": "Fortschritt aus Entität",
+            "done_text": "Meldung beim Ende",
+            "calendars": "Kalender",
+            "days": "Vorschau (Tage)"
+          },
+          "data_description": {
+            "icon": "Eingebautes Symbol, LaMetric-Icon-Nummer oder Bilddatei (/config/www/…).",
+            "color": "Leer = Standard-Textfarbe des Displays.",
+            "label": "Optional, z. B. „Innen“.",
+            "unit": "Leer = Einheit der Entität.",
+            "decimals": "Leer = automatisch.",
+            "active_states": "Seite erscheint bei diesen Zuständen, z. B. on, run, charging.",
+            "above": "Oder: Seite erscheint, solange der Wert darüber liegt, z. B. Leistung > 5 W.",
+            "off_delay": "So lange bleibt die Seite nach dem Ende stehen (Pausen der Waschmaschine).",
+            "text": "Leer = Name der Seite. Templates erlaubt, z. B. {{ states('sensor.restzeit') }} min.",
+            "done_text": "Optional: Benachrichtigung, wenn der Status endet, z. B. „Waschmaschine fertig!“."
+          }
+        }
+      },
+      "error": {
+        "status_condition": "Bitte „Aktiv bei Zustand“ oder „Aktiv über Wert“ angeben."
+      }
+    }
+  },
+  "selector": {
+    "app_type": {
+      "options": {
+        "clock": "Uhr",
+        "date": "Datum",
+        "weather": "Wetter",
+        "value": "Wert (Temperatur, Akku, …)",
+        "power": "Stromverbrauch",
+        "status": "Status (z. B. Waschmaschine läuft)",
+        "text": "Text / Template",
+        "calendar": "Termine"
+      }
+    },
+    "effect": {
+      "options": {
+        "none": "Keiner",
+        "rainbow": "Regenbogen-Text",
+        "matrix": "Matrix",
+        "twinkle": "Sternenfunkeln",
+        "fire": "Feuer",
+        "plasma": "Plasma",
+        "snow": "Schnee",
+        "rain": "Regen",
+        "pulse": "Pulsieren"
+      }
+    },
+    "icon": {
+      "options": {
+        "auto": "Automatisch",
+        "none": "Kein Symbol",
+        "battery": "Batterie",
+        "bed": "Bett",
+        "bell": "Glocke",
+        "bulb": "Lampe",
+        "calendar": "Kalender",
+        "car": "Auto",
+        "check": "Haken",
+        "clock": "Uhr",
+        "cloud": "Wolke",
+        "coffee": "Kaffee",
+        "dishwasher": "Spülmaschine",
+        "door": "Tür",
+        "drop": "Tropfen",
+        "dryer": "Trockner",
+        "euro": "Euro",
+        "ev": "E-Auto laden",
+        "fan": "Ventilator",
+        "fire": "Feuer",
+        "fog": "Nebel",
+        "heart": "Herz",
+        "house": "Haus",
+        "info": "Info",
+        "lock": "Schloss zu",
+        "mail": "Post",
+        "moon": "Mond",
+        "music": "Musik",
+        "partlycloudy": "Teils bewölkt",
+        "person": "Person",
+        "plant": "Pflanze",
+        "plug": "Steckdose",
+        "power": "Blitz",
+        "radiator": "Heizung",
+        "rain": "Regen",
+        "snow": "Schnee",
+        "snowflake": "Schneeflocke",
+        "solar": "Solar",
+        "star": "Stern",
+        "sun": "Sonne",
+        "thermometer": "Thermometer",
+        "thunder": "Gewitter",
+        "trash": "Mülltonne",
+        "tv": "Fernseher",
+        "unlock": "Schloss offen",
+        "warning": "Warnung",
+        "washer": "Waschmaschine",
+        "wifi": "WLAN",
+        "wind": "Wind",
+        "window": "Fenster"
       }
     }
   }
