@@ -8,11 +8,21 @@ Home Assistant custom integration `pixel_clock` for iPixel Color BLE LED panels 
 - Protocol verified live from the laptop (`tools/live_test.py`): device info type 131 = 64x16,
   MTU 517, PNG/GIF upload with ACKs works, GIF with partial frames (disposal 1) decodes correctly
   on the panel. ~5-6 KB/s over BLE from the laptop.
-- Integration code complete, lint + tests green; NOT yet running in Home Assistant.
-- HA: https://smarthome.andom.eu (2026.10.4), token in ~/.ha_token, `tools/ha_ws.py` lives in
-  c:/git/ha-devicontrol. SSH to HA not reachable (port 22 closed externally, LAN IP timed out).
-  The panel is seen by the Pi's own adapter (E4:5F:01:32:5C:D3, RSSI ~-59).
-- Deploy path: GitHub repo + HACS like ha-devicontrol. Push only when the user says so.
+- Running in HA since 2026-11-01: public repo dominguez-posh/ha-pixelclock, installed via HACS
+  (HACS repo id 1441811331), entry "Pixel Clock FDD4" (01M6BM54E630TSQ5XP3ZB9K76S) on the Pi's
+  own adapter. Options: clock, date, weather.forecast_home, power
+  sensor.shellypro3em_2cbcbba65a64_total_active_power, calendar.lucas_privat_2.
+- Uploads: write without response, 509-byte chunks, MTU must be acquired on BlueZ (else 23).
+  Measured: 22 KB GIF in 0.4 s (laptop); notification visible ~2 s after the action in HA.
+- Update flow: push -> `hacs/repository/refresh` + `hacs/repository/download` via ha_ws.py ->
+  HA restart (ask the user first). HA: https://smarthome.andom.eu (2026.10.4), token in
+  ~/.ha_token, `tools/ha_ws.py` in c:/git/ha-devicontrol. SSH to HA not reachable.
+- While HA is connected the panel does not advertise: for laptop tests disable the entry
+  (`config_entries/disable`) and enable it again afterwards.
+
+## Ideas not done yet
+
+- Animated LaMetric icons (only the first frame is used), night dimming, 12 h clock.
 
 ## Rules
 
