@@ -66,19 +66,28 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     ic = icons.builtin_icon
     screens = {
-        "clock": render.render_clock(NOW, W, H),
+        "clock": render.render_clock(NOW, W, H, seconds=True),
         "date": render.render_screen(Screen([Line("Sonntag"), Line("01.11.2026", CYAN)]), W, H),
         "weather": render.render_screen(Screen([Line("11°")], icon=ic("partlycloudy")), W, H),
         "power": render.render_screen(Screen([Line("1,1 kW", YELLOW)], icon=ic("power")), W, H),
         "feed_in": render.render_screen(Screen([Line("-2,4 kW", GREEN)], icon=ic("solar")), W, H),
-        "car": render.render_screen(Screen([Line("48%", GREEN)], icon=ic("car"), progress=48), W, H),
-        "dishwasher": render.render_screen(Screen([Line("133 min", CYAN)], icon=ic("drop"), progress=35), W, H),
+        "car": render.render_screen(Screen([Line("48%", GREEN)], icon=ic("ev"), progress=48), W, H),
+        "dishwasher": render.render_screen(Screen([Line("133 min", CYAN)], icon=ic("dishwasher"), progress=35), W, H),
         "calendar": render.render_screen(Screen([Line("Mo 09:30", YELLOW), Line("Zahnarzt")], icon=ic("calendar")), W, H),
     }
     grid([still(r) for r in screens.values()], cols=2).save(OUT / "apps.png", optimize=True)
     still(screens["clock"]).save(OUT / "clock.png", optimize=True)
 
-    notify = render.render_screen(Screen([Line("Waschmaschine fertig!", GREEN)], icon=ic("check")), W, H)
+    # background effects (one still per effect) and an animated example
+    from pixel_clock import effects  # noqa: PLC0415
+    fx = [render.render_screen(Screen([Line(name.title())], effect=name), W, H)
+          for name in effects.EFFECTS if name != "none"]
+    grid([panel(r.frames[len(r.frames) // 3]) for r in fx], cols=2).save(OUT / "effects.png", optimize=True)
+    save_gif(render.render_screen(Screen([Line("11°")], icon=ic("snowflake"), effect="snow"), W, H), "effect_snow.gif",
+             step=1)
+    save_gif(render.render_clock(datetime(2026, 11, 1, 14, 37, 50), W, H, seconds=True), "clock_seconds.gif", step=1)
+
+    notify = render.render_screen(Screen([Line("Waschmaschine fertig!", GREEN)], icon=ic("washer")), W, H)
     save_gif(notify, "notification.gif")
     save_gif(render.render_clock(NOW, W, H), "clock.gif", step=1)
 

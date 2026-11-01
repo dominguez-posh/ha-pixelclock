@@ -1,10 +1,11 @@
 # Pixel Clock for Home Assistant
 
-<p align="center"><img src="docs/images/clock.gif" alt="Pixel Clock showing the time" width="660"></p>
+<p align="center"><img src="docs/images/clock_seconds.gif" alt="Pixel Clock showing the time with seconds" width="660"></p>
 
 Turns a cheap **iPixel Color** Bluetooth LED panel into a smart home display, similar to an
-AWTRIX / Ulanzi clock: time, date, weather, current power consumption, the next appointment,
-any sensor value and your own pages rotate on the panel; notifications interrupt the rotation.
+AWTRIX / Ulanzi clock. You decide which pages (apps) it shows – clock, date, weather, any value,
+power consumption, a status like "washing machine running", text or appointments – each with a
+small icon and an optional animated background effect. Notifications interrupt the rotation.
 Landscape or portrait. No cloud, no bridge, no firmware flashing.
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dominguez-posh&repository=ha-pixelclock&category=integration)
@@ -16,40 +17,62 @@ Action: [Briloner LED-Zeichentablet, article 3226274](https://www.action.com/de-
 It is an iPixel Color panel: Bluetooth name `LED_BLE_…`, vendor app *iPixels*. Other iPixel Color
 panels (32×16 … 448×32, e.g. BGLight) speak the same protocol; the size is read from the panel.
 
-## What it shows
+## Apps
+
+Every panel has its own list of apps: **Settings → Devices & services → Pixel Clock → Add page**.
+Pick the kind of page, then what it shows, an icon, a colour and a background effect. Each app can
+be edited or deleted later and has a switch *Page &lt;name&gt;* on the device page. A new panel
+starts with clock and date.
 
 <p align="center"><img src="docs/images/apps.png" alt="Pages: clock, date, weather, power, feed-in, car battery, dishwasher, appointment" width="820"></p>
 
-| Built in (options) | With a blueprint or action |
-|---|---|
-| Clock with blinking colon and weekday bar | Any value as a page, optionally with progress bar (car battery, temperature, CO₂ …) |
-| Date | Page only while a device is active (dishwasher with remaining time, car charging) |
-| Weather (icon + temperature) | "Washing machine running / done" from a power meter |
-| Power consumption (yellow from 1 kW, red from 3 kW, green with solar icon when feeding in) | Notification on any state change (bin full, someone comes home) |
-| Next appointment from one or more calendars | Night mode (dim or off) |
-| Further sensors, one page each | Own pages and notifications from any automation |
+| Kind | Shows | Settings |
+|---|---|---|
+| **Clock** | HH:MM with blinking colon, small running seconds, weekday bar | seconds, weekday bar |
+| **Date** | weekday and date | |
+| **Weather** | condition icon and temperature | weather entity |
+| **Value** | any entity – temperature, battery, CO₂ … | label, unit, decimals, progress bar (min/max) |
+| **Power** | consumption, yellow from 1 kW, red from 3 kW, green with solar icon when feeding in | power sensor |
+| **Status** | a page only while something is active, e.g. "washing machine running" | active states or "above value", hold time for pauses, text (templates allowed), progress entity, message when it ends |
+| **Text** | fixed text or a template | text |
+| **Appointments** | the next appointment from one or more calendars | calendars, days ahead |
 
-The page on screen follows its entity live (e.g. power consumption, at most one update per
-second). Notifications appear within about two seconds and scroll when the text is long:
+The page on screen follows its entity live (at most one update per second). Text that does not
+fit scrolls; a line break gives two lines.
+
+### Background effects
+
+<p align="center"><img src="docs/images/effects.png" alt="Effects: rainbow, matrix, twinkle, fire, plasma, snow, rain, pulse" width="820"></p>
+
+Rainbow text, matrix, twinkling stars, fire, plasma, snow, rain and pulse – seamless loops, kept
+dim behind text and icon:
+
+<p align="center"><img src="docs/images/effect_snow.gif" alt="Snow effect" width="660"></p>
+
+### Icons
+
+<p align="center"><img src="docs/images/icons.png" alt="Built-in icons"></p>
+
+48 built-in icons, among them washing machine, dishwasher, dryer, plug, lamp, window, lock,
+plant, Wi-Fi, music, TV, mail, fan, radiator, EV charging, weather and more – or any
+[LaMetric icon](https://developer.lametric.com/icons) by its number (downloaded once, cached), or
+an image file from an allowed folder such as `/config/www/`. *Automatic* picks the icon from the
+weather condition or the device class.
+
+### Notifications
+
+Notifications (action `pixel_clock.notify`, the *Message* text entity or a status app that ends)
+appear within about two seconds:
 
 <p align="center"><img src="docs/images/notification.gif" alt="Scrolling notification" width="660"></p>
 
 ### Portrait
 
 Hang the panel upright and pick the matching **Orientation**. Home Assistant then draws on
-16×64 (icon on top, wrapped text, text scrolling upwards, stacked clock with weekday and date)
-and rotates the picture before sending it.
+16×64 (icon on top, wrapped text, text scrolling upwards, stacked clock with seconds, weekday and
+date) and rotates the picture before sending it.
 
 <p align="center"><img src="docs/images/portrait.png" alt="Portrait layouts" width="440"></p>
-
-### Built-in icons
-
-<p align="center"><img src="docs/images/icons.png" alt="Built-in icons"></p>
-
-`battery bell calendar car check cloud door drop fog heart house info moon partlycloudy power rain
-snow solar sun thermometer thunder trash warning wind` – or any
-[LaMetric icon](https://developer.lametric.com/icons) by its number (downloaded once, cached), or
-an image file from an allowed folder such as `/config/www/`.
 
 ## Requirements
 
@@ -66,14 +89,16 @@ The USB cable only powers the panel (tested: no USB device shows up), so control
    `https://github.com/dominguez-posh/ha-pixelclock`, type **Integration**.
 2. Install **Pixel Clock (iPixel Color)** and restart Home Assistant.
 3. The panel shows up under **Settings → Devices & services → Discovered** → **Add**.
-4. **Configure** (⚙) picks the built-in pages: clock, date, weather, power sensor, calendars,
-   further sensors, text colour.
+4. **Add page** for every app you want; **Configure** (⚙) sets the default text colour.
+
+Updating from 0.1 (pages in the options): the pages are turned into apps automatically.
 
 Manual alternative: copy `custom_components/pixel_clock` into `config/custom_components` and restart.
 
-## Pages with blueprints
+## Pages from automations (blueprints)
 
-Click to import, then **Create automation** from the blueprint and choose your entities:
+Apps cover most cases. For pages driven by your own automations, import a blueprint, then
+**Create automation** from it and choose your entities:
 
 | Blueprint | Import | Example |
 |---|---|---|
@@ -88,8 +113,8 @@ Click to import, then **Create automation** from the blueprint and choose your e
 | Entity | |
 |---|---|
 | Light | Power and brightness |
-| Switches *Page clock / date / weather / power / appointments* | Built-in pages of this panel (device page → configuration) |
-| Selects *Weather / Power / Appointments source* | Entity feeding the page; same settings as the ⚙ options |
+| Switch *Page &lt;name&gt;* | One per app: show it on this panel or not |
+| Switch *Automation page &lt;name&gt;* | One per page set by an automation (`pixel_clock.set_app`) |
 | Image *Preview* | Live picture of what the panel shows (animated while text scrolls) – put it on a dashboard with a picture entity card |
 | Select *Mode* | *Apps* (rotation rendered by Home Assistant) or *Built-in clock* (the panel's own clock face) |
 | Select *Orientation* | Landscape, portrait (left or right end on top), upside down |
@@ -107,8 +132,9 @@ Click to import, then **Create automation** from the blueprint and choose your e
 action: pixel_clock.notify
 data:
   text: "Waschmaschine fertig"
-  icon: check           # built-in name, LaMetric icon id (e.g. 2867) or an image file
+  icon: washer          # built-in name, LaMetric icon id (e.g. 2867) or an image file
   color: [0, 200, 60]
+  effect: twinkle       # optional background effect
   duration: 15
 
 # own page in the rotation (templates are rendered by the automation)

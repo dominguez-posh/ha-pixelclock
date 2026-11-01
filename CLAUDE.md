@@ -39,6 +39,16 @@ Home Assistant custom integration `pixel_clock` for iPixel Color BLE LED panels 
 - Page settings live in the entry options; the device page has switches/selects writing the same
   options (coordinator.async_set_option), the options form keeps keys it does not show.
 
+- Version 2 (2026-11-01): pages are config subentries of type "app" (types clock, date, weather,
+  value, power, status, text, calendar; icon, colour, effect each). Migration 1->2 turned the
+  options into apps. Backup of the registries before it: /backup/pixel_clock_pre_v2 on HA.
+- Never add entities with config_subentry_id while they share the panel device: HA then moves
+  the device between subentries and deletes the entities of the previous assignment (happened
+  with f07d198, repaired by _detach_from_subentries in e842cc0).
+- Clock with seconds = GIF counting to the end of the minute; Rendered.valid_until keeps it from
+  being re-sent within the minute (re-sending restarted the GIF and the seconds jumped).
+- The user toggles app switches himself (logbook shows his user id); don't "fix" disabled apps.
+
 ## Ideas not done yet
 
 - Animated LaMetric icons (only the first frame is used), night dimming, 12 h clock.
