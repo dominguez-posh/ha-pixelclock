@@ -10,6 +10,17 @@ CONF_HEIGHT = "height"
 # Options: built-in apps
 CONF_SHOW_CLOCK = "show_clock"
 CONF_SHOW_DATE = "show_date"
+CONF_SHOW_WEATHER = "show_weather"
+CONF_SHOW_POWER = "show_power"
+CONF_SHOW_CALENDAR = "show_calendar"
+# page switches on the device page: option key -> translation key of the switch
+PAGE_SWITCHES = {
+    CONF_SHOW_CLOCK: "page_clock",
+    CONF_SHOW_DATE: "page_date",
+    CONF_SHOW_WEATHER: "page_weather",
+    CONF_SHOW_POWER: "page_power",
+    CONF_SHOW_CALENDAR: "page_calendar",
+}
 CONF_WEATHER = "weather_entity"
 CONF_POWER = "power_entity"
 CONF_CALENDARS = "calendar_entities"

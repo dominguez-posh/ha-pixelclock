@@ -6,7 +6,9 @@
         "description": "Add {name} ({address}, {size} pixels)?"
       },
       "user": {
-        "data": { "address": "Panel" }
+        "data": {
+          "address": "Panel"
+        }
       }
     },
     "abort": {
@@ -34,21 +36,34 @@
   },
   "entity": {
     "button": {
-      "next_app": { "name": "Next app" },
-      "dismiss": { "name": "Dismiss notification" }
+      "next_app": {
+        "name": "Next app"
+      },
+      "dismiss": {
+        "name": "Dismiss notification"
+      }
     },
     "image": {
-      "preview": { "name": "Preview" }
+      "preview": {
+        "name": "Preview"
+      }
     },
     "number": {
-      "app_duration": { "name": "App duration" }
+      "app_duration": {
+        "name": "App duration"
+      }
     },
     "select": {
       "mode": {
         "name": "Mode",
-        "state": { "apps": "Apps", "native_clock": "Built-in clock" }
+        "state": {
+          "apps": "Apps",
+          "native_clock": "Built-in clock"
+        }
       },
-      "clock_style": { "name": "Built-in clock face" },
+      "clock_style": {
+        "name": "Built-in clock face"
+      },
       "orientation": {
         "name": "Orientation",
         "state": {
@@ -57,63 +72,151 @@
           "portrait_right": "Portrait (right end on top)",
           "upside_down": "Landscape, upside down"
         }
+      },
+      "source_weather": {
+        "name": "Weather source"
+      },
+      "source_power": {
+        "name": "Power source"
+      },
+      "source_calendar": {
+        "name": "Appointments source"
       }
     },
     "sensor": {
-      "current_app": { "name": "Current app" },
-      "panel": { "name": "Panel" }
+      "current_app": {
+        "name": "Current app"
+      },
+      "panel": {
+        "name": "Panel"
+      }
     },
     "switch": {
-      "auto_rotate": { "name": "Rotate apps" }
+      "auto_rotate": {
+        "name": "Rotate apps"
+      },
+      "page_clock": {
+        "name": "Page clock"
+      },
+      "page_date": {
+        "name": "Page date"
+      },
+      "page_weather": {
+        "name": "Page weather"
+      },
+      "page_power": {
+        "name": "Page power"
+      },
+      "page_calendar": {
+        "name": "Page appointments"
+      }
     },
     "text": {
-      "message": { "name": "Message" }
+      "message": {
+        "name": "Message"
+      }
     }
   },
   "exceptions": {
-    "no_device": { "message": "No Pixel Clock found." }
+    "no_device": {
+      "message": "No Pixel Clock found."
+    }
   },
   "services": {
     "notify": {
       "name": "Notify",
       "description": "Show a notification right away; the app rotation continues afterwards.",
       "fields": {
-        "device_id": { "name": "Panel", "description": "Panels to use (default: all)." },
-        "text": { "name": "Text", "description": "Text; a line break gives two lines. Long text scrolls." },
-        "icon": { "name": "Icon", "description": "Built-in name (bell, power, sun, calendar, warning, heart, …), LaMetric icon id or image file path." },
-        "color": { "name": "Colour", "description": "Text colour." },
-        "duration": { "name": "Duration", "description": "Seconds (default 10 s or one scroll pass)." },
-        "progress": { "name": "Progress", "description": "Progress bar 0-100 %." },
-        "progress_color": { "name": "Progress colour", "description": "Colour of the progress bar." }
+        "device_id": {
+          "name": "Panel",
+          "description": "Panels to use (default: all)."
+        },
+        "text": {
+          "name": "Text",
+          "description": "Text; a line break gives two lines. Long text scrolls."
+        },
+        "icon": {
+          "name": "Icon",
+          "description": "Built-in name (bell, power, sun, calendar, warning, heart, …), LaMetric icon id or image file path."
+        },
+        "color": {
+          "name": "Colour",
+          "description": "Text colour."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Seconds (default 10 s or one scroll pass)."
+        },
+        "progress": {
+          "name": "Progress",
+          "description": "Progress bar 0-100 %."
+        },
+        "progress_color": {
+          "name": "Progress colour",
+          "description": "Colour of the progress bar."
+        }
       }
     },
     "set_app": {
       "name": "Set app",
       "description": "Create or update an app in the rotation. The text may contain templates, rendered every time the app is shown.",
       "fields": {
-        "device_id": { "name": "Panel", "description": "Panels to use (default: all)." },
-        "name": { "name": "Name", "description": "Unique app name (lower case, no spaces)." },
-        "text": { "name": "Text", "description": "Text or template; a line break gives two lines." },
-        "icon": { "name": "Icon", "description": "Built-in name, LaMetric icon id or image file path." },
-        "color": { "name": "Colour", "description": "Text colour." },
-        "progress": { "name": "Progress", "description": "Progress bar 0-100 %." },
-        "progress_color": { "name": "Progress colour", "description": "Colour of the progress bar." },
-        "lifetime": { "name": "Lifetime", "description": "Remove the app when it was not updated for this many seconds." }
+        "device_id": {
+          "name": "Panel",
+          "description": "Panels to use (default: all)."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Unique app name (lower case, no spaces)."
+        },
+        "text": {
+          "name": "Text",
+          "description": "Text or template; a line break gives two lines."
+        },
+        "icon": {
+          "name": "Icon",
+          "description": "Built-in name, LaMetric icon id or image file path."
+        },
+        "color": {
+          "name": "Colour",
+          "description": "Text colour."
+        },
+        "progress": {
+          "name": "Progress",
+          "description": "Progress bar 0-100 %."
+        },
+        "progress_color": {
+          "name": "Progress colour",
+          "description": "Colour of the progress bar."
+        },
+        "lifetime": {
+          "name": "Lifetime",
+          "description": "Remove the app when it was not updated for this many seconds."
+        }
       }
     },
     "remove_app": {
       "name": "Remove app",
       "description": "Remove an app created with set_app.",
       "fields": {
-        "device_id": { "name": "Panel", "description": "Panels to use (default: all)." },
-        "name": { "name": "Name", "description": "App name." }
+        "device_id": {
+          "name": "Panel",
+          "description": "Panels to use (default: all)."
+        },
+        "name": {
+          "name": "Name",
+          "description": "App name."
+        }
       }
     },
     "dismiss": {
       "name": "Dismiss notification",
       "description": "End the notification currently shown.",
       "fields": {
-        "device_id": { "name": "Panel", "description": "Panels to use (default: all)." }
+        "device_id": {
+          "name": "Panel",
+          "description": "Panels to use (default: all)."
+        }
       }
     }
   }

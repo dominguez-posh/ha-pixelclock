@@ -110,7 +110,12 @@ def _entity(domain: str | list[str], multiple: bool = False, device_class: str |
 class PixelClockOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            # keep options set on the device page (page switches); fields of this form are replaced,
+            # so clearing an optional entity here removes it
+            form_keys = {CONF_SHOW_CLOCK, CONF_SHOW_DATE, CONF_WEATHER, CONF_POWER, CONF_CALENDARS,
+                         CONF_CALENDAR_DAYS, CONF_SENSORS, CONF_COLOR}
+            kept = {k: v for k, v in self.config_entry.options.items() if k not in form_keys}
+            return self.async_create_entry(data={**kept, **user_input})
         o = self.config_entry.options
 
         def opt(key: str) -> dict[str, Any]:

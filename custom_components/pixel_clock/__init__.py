@@ -117,4 +117,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: PixelClockConfigEntry) 
 
 async def _async_options_updated(hass: HomeAssistant, entry: PixelClockConfigEntry) -> None:
     # options only change which apps are shown: no reload (and no reconnect) needed
+    entry.runtime_data.async_track_entities()
+    entry.runtime_data.async_update_listeners()  # page switches and source selects on the device page
     entry.runtime_data.wake()

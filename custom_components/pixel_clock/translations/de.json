@@ -6,7 +6,9 @@
         "description": "{name} ({address}, {size} Pixel) hinzufügen?"
       },
       "user": {
-        "data": { "address": "Display" }
+        "data": {
+          "address": "Display"
+        }
       }
     },
     "abort": {
@@ -34,21 +36,34 @@
   },
   "entity": {
     "button": {
-      "next_app": { "name": "Nächste App" },
-      "dismiss": { "name": "Benachrichtigung beenden" }
+      "next_app": {
+        "name": "Nächste App"
+      },
+      "dismiss": {
+        "name": "Benachrichtigung beenden"
+      }
     },
     "image": {
-      "preview": { "name": "Vorschau" }
+      "preview": {
+        "name": "Vorschau"
+      }
     },
     "number": {
-      "app_duration": { "name": "Anzeigedauer pro App" }
+      "app_duration": {
+        "name": "Anzeigedauer pro App"
+      }
     },
     "select": {
       "mode": {
         "name": "Modus",
-        "state": { "apps": "Apps", "native_clock": "Eingebaute Uhr" }
+        "state": {
+          "apps": "Apps",
+          "native_clock": "Eingebaute Uhr"
+        }
       },
-      "clock_style": { "name": "Ziffernblatt eingebaute Uhr" },
+      "clock_style": {
+        "name": "Ziffernblatt eingebaute Uhr"
+      },
       "orientation": {
         "name": "Ausrichtung",
         "state": {
@@ -57,63 +72,151 @@
           "portrait_right": "Hochkant (rechtes Ende oben)",
           "upside_down": "Quer, auf dem Kopf"
         }
+      },
+      "source_weather": {
+        "name": "Quelle Wetter"
+      },
+      "source_power": {
+        "name": "Quelle Verbrauch"
+      },
+      "source_calendar": {
+        "name": "Quelle Termine"
       }
     },
     "sensor": {
-      "current_app": { "name": "Aktuelle App" },
-      "panel": { "name": "Display" }
+      "current_app": {
+        "name": "Aktuelle App"
+      },
+      "panel": {
+        "name": "Display"
+      }
     },
     "switch": {
-      "auto_rotate": { "name": "Apps wechseln" }
+      "auto_rotate": {
+        "name": "Apps wechseln"
+      },
+      "page_clock": {
+        "name": "Seite Uhr"
+      },
+      "page_date": {
+        "name": "Seite Datum"
+      },
+      "page_weather": {
+        "name": "Seite Wetter"
+      },
+      "page_power": {
+        "name": "Seite Verbrauch"
+      },
+      "page_calendar": {
+        "name": "Seite Termine"
+      }
     },
     "text": {
-      "message": { "name": "Nachricht" }
+      "message": {
+        "name": "Nachricht"
+      }
     }
   },
   "exceptions": {
-    "no_device": { "message": "Keine Pixel Clock gefunden." }
+    "no_device": {
+      "message": "Keine Pixel Clock gefunden."
+    }
   },
   "services": {
     "notify": {
       "name": "Benachrichtigen",
       "description": "Zeigt sofort eine Benachrichtigung, danach läuft die App-Rotation weiter.",
       "fields": {
-        "device_id": { "name": "Display", "description": "Zu verwendende Displays (Standard: alle)." },
-        "text": { "name": "Text", "description": "Text; ein Zeilenumbruch ergibt zwei Zeilen. Langer Text läuft durch." },
-        "icon": { "name": "Icon", "description": "Eingebauter Name (bell, power, sun, calendar, warning, heart, …), LaMetric-Icon-ID oder Bilddatei." },
-        "color": { "name": "Farbe", "description": "Textfarbe." },
-        "duration": { "name": "Dauer", "description": "Sekunden (Standard 10 s oder ein Durchlauf)." },
-        "progress": { "name": "Fortschritt", "description": "Fortschrittsbalken 0-100 %." },
-        "progress_color": { "name": "Fortschrittsfarbe", "description": "Farbe des Fortschrittsbalkens." }
+        "device_id": {
+          "name": "Display",
+          "description": "Zu verwendende Displays (Standard: alle)."
+        },
+        "text": {
+          "name": "Text",
+          "description": "Text; ein Zeilenumbruch ergibt zwei Zeilen. Langer Text läuft durch."
+        },
+        "icon": {
+          "name": "Icon",
+          "description": "Eingebauter Name (bell, power, sun, calendar, warning, heart, …), LaMetric-Icon-ID oder Bilddatei."
+        },
+        "color": {
+          "name": "Farbe",
+          "description": "Textfarbe."
+        },
+        "duration": {
+          "name": "Dauer",
+          "description": "Sekunden (Standard 10 s oder ein Durchlauf)."
+        },
+        "progress": {
+          "name": "Fortschritt",
+          "description": "Fortschrittsbalken 0-100 %."
+        },
+        "progress_color": {
+          "name": "Fortschrittsfarbe",
+          "description": "Farbe des Fortschrittsbalkens."
+        }
       }
     },
     "set_app": {
       "name": "App setzen",
       "description": "Legt eine App in der Rotation an oder aktualisiert sie. Der Text darf Templates enthalten, sie werden bei jeder Anzeige neu ausgewertet.",
       "fields": {
-        "device_id": { "name": "Display", "description": "Zu verwendende Displays (Standard: alle)." },
-        "name": { "name": "Name", "description": "Eindeutiger App-Name (klein, ohne Leerzeichen)." },
-        "text": { "name": "Text", "description": "Text oder Template; ein Zeilenumbruch ergibt zwei Zeilen." },
-        "icon": { "name": "Icon", "description": "Eingebauter Name, LaMetric-Icon-ID oder Bilddatei." },
-        "color": { "name": "Farbe", "description": "Textfarbe." },
-        "progress": { "name": "Fortschritt", "description": "Fortschrittsbalken 0-100 %." },
-        "progress_color": { "name": "Fortschrittsfarbe", "description": "Farbe des Fortschrittsbalkens." },
-        "lifetime": { "name": "Lebensdauer", "description": "App entfernen, wenn sie so viele Sekunden nicht aktualisiert wurde." }
+        "device_id": {
+          "name": "Display",
+          "description": "Zu verwendende Displays (Standard: alle)."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Eindeutiger App-Name (klein, ohne Leerzeichen)."
+        },
+        "text": {
+          "name": "Text",
+          "description": "Text oder Template; ein Zeilenumbruch ergibt zwei Zeilen."
+        },
+        "icon": {
+          "name": "Icon",
+          "description": "Eingebauter Name, LaMetric-Icon-ID oder Bilddatei."
+        },
+        "color": {
+          "name": "Farbe",
+          "description": "Textfarbe."
+        },
+        "progress": {
+          "name": "Fortschritt",
+          "description": "Fortschrittsbalken 0-100 %."
+        },
+        "progress_color": {
+          "name": "Fortschrittsfarbe",
+          "description": "Farbe des Fortschrittsbalkens."
+        },
+        "lifetime": {
+          "name": "Lebensdauer",
+          "description": "App entfernen, wenn sie so viele Sekunden nicht aktualisiert wurde."
+        }
       }
     },
     "remove_app": {
       "name": "App entfernen",
       "description": "Entfernt eine mit set_app angelegte App.",
       "fields": {
-        "device_id": { "name": "Display", "description": "Zu verwendende Displays (Standard: alle)." },
-        "name": { "name": "Name", "description": "App-Name." }
+        "device_id": {
+          "name": "Display",
+          "description": "Zu verwendende Displays (Standard: alle)."
+        },
+        "name": {
+          "name": "Name",
+          "description": "App-Name."
+        }
       }
     },
     "dismiss": {
       "name": "Benachrichtigung beenden",
       "description": "Beendet die gerade angezeigte Benachrichtigung.",
       "fields": {
-        "device_id": { "name": "Display", "description": "Zu verwendende Displays (Standard: alle)." }
+        "device_id": {
+          "name": "Display",
+          "description": "Zu verwendende Displays (Standard: alle)."
+        }
       }
     }
   }

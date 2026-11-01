@@ -17,9 +17,10 @@ from bleak.exc import BleakError
 from homeassistant.components import bluetooth
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.template import Template
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -41,8 +42,11 @@ from .const import (
     CONF_HEIGHT,
     CONF_POWER,
     CONF_SENSORS,
+    CONF_SHOW_CALENDAR,
     CONF_SHOW_CLOCK,
     CONF_SHOW_DATE,
+    CONF_SHOW_POWER,
+    CONF_SHOW_WEATHER,
     CONF_WEATHER,
     CONF_WIDTH,
     DEFAULT_APP_SECONDS,
@@ -63,6 +67,8 @@ from .device import PixelClockClient
 from .render import Line, Screen
 
 _LOGGER = logging.getLogger(__name__)
+
+LIVE_REFRESH_SECONDS = 1.0
 
 BLE_ERRORS = (BleakError, TimeoutError, ConnectionError, EOFError)
 
@@ -133,6 +139,8 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         self._calendar_fetched: datetime | None = None
         self._icons: dict[str, Image.Image | None] = {}
         self._icon_dir = Path(hass.config.path(".storage", f"{DOMAIN}_icons"))
+        self._unsub_states: CALLBACK_TYPE | None = None
+        self._last_upload = 0.0
 
     # ---- lifecycle -------------------------------------------------------------------------
 
@@ -140,12 +148,16 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         if data := await self._store.async_load():
             known = _Settings.__dataclass_fields__
             self.settings = _Settings(**{k: v for k, v in data.items() if k in known})
+        self.async_track_entities()
         self._task = self.config_entry.async_create_background_task(
             self.hass, self._run(), f"{DOMAIN} display {self.address}"
         )
 
     async def async_shutdown(self) -> None:
         await super().async_shutdown()
+        if self._unsub_states:
+            self._unsub_states()
+            self._unsub_states = None
         if self._task:
             self._task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -157,6 +169,38 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
 
     def wake(self) -> None:
         self._wake.set()
+
+    @callback
+    def async_set_option(self, key: str, value: Any) -> None:
+        """Change one page option from an entity on the device page (same storage as the options flow)."""
+        options = {**self.options}
+        if value is None:
+            options.pop(key, None)
+        else:
+            options[key] = value
+        self.hass.config_entries.async_update_entry(self.config_entry, options=options)
+
+    @callback
+    def async_track_entities(self) -> None:
+        """Listen to the entities of the built-in pages, so a page on screen shows live values."""
+        if self._unsub_states:
+            self._unsub_states()
+            self._unsub_states = None
+        entities = [e for e in (self.options.get(CONF_POWER), self.options.get(CONF_WEATHER)) if e]
+        entities += self.options.get(CONF_SENSORS, [])
+        if entities:
+            self._unsub_states = async_track_state_change_event(self.hass, entities, self._on_state_change)
+
+    @callback
+    def _on_state_change(self, event: Event[EventStateChangedData]) -> None:
+        entity_id = event.data["entity_id"]
+        pages = {f"sensor:{entity_id}"}
+        if entity_id == self.options.get(CONF_POWER):
+            pages.add(APP_POWER)
+        if entity_id == self.options.get(CONF_WEATHER):
+            pages.add(APP_WEATHER)
+        if self.data.current_app in pages:
+            self.wake()
 
     @property
     def options(self) -> dict[str, Any]:
@@ -286,6 +330,10 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
             current = apps[self._app_index]
             self._app_until = 0
             self._advance = False
+        elif self._shown is not None and self._shown.key == current:
+            # live update of the page on screen: at most one upload per LIVE_REFRESH_SECONDS
+            if (wait := self._last_upload + LIVE_REFRESH_SECONDS - time.monotonic()) > 0:
+                await asyncio.sleep(wait)
 
         rendered = await self._send(current, await self._build(current))
         if self._app_until == 0:
@@ -306,6 +354,7 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         if self._shown is not None and self._shown.key == key and self._shown.digest == digest:
             return rendered
         await self.client.async_send_image(self._ble_device(), data, is_gif)
+        self._last_upload = time.monotonic()
         self._shown = _Shown(key, digest, rendered.cycle_ms)
         self._native_clock_shown = False
         self.data.preview = await self.hass.async_add_executor_job(render.preview, rendered)
@@ -331,11 +380,11 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
             names.append(APP_CLOCK)
         if opts.get(CONF_SHOW_DATE, True):
             names.append(APP_DATE)
-        if self._usable(opts.get(CONF_WEATHER)):
+        if opts.get(CONF_SHOW_WEATHER, True) and self._usable(opts.get(CONF_WEATHER)):
             names.append(APP_WEATHER)
-        if self._usable(opts.get(CONF_POWER)):
+        if opts.get(CONF_SHOW_POWER, True) and self._usable(opts.get(CONF_POWER)):
             names.append(APP_POWER)
-        if opts.get(CONF_CALENDARS) and self._next_event():
+        if opts.get(CONF_SHOW_CALENDAR, True) and opts.get(CONF_CALENDARS) and self._next_event():
             names.append(APP_CALENDAR)
         names.extend(f"sensor:{e}" for e in opts.get(CONF_SENSORS, []) if self._usable(e))
         now = dt_util.utcnow()
