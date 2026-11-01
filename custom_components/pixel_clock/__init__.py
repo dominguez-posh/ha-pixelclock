@@ -51,14 +51,16 @@ DISMISS_SCHEMA = vol.Schema(_TARGET)
 def _coordinators(hass: HomeAssistant, call: ServiceCall) -> list[PixelClockCoordinator]:
     entries = list(hass.config_entries.async_loaded_entries(DOMAIN))
     if device_ids := call.data.get(ATTR_DEVICE_ID):
+        # the device identifier is (DOMAIN, Bluetooth address) = the entry's unique id
         registry = dr.async_get(hass)
         wanted = {
-            entry_id
+            ident
             for device_id in device_ids
             if (device := registry.async_get(device_id))
-            for entry_id in device.config_entries
+            for domain, ident in device.identifiers
+            if domain == DOMAIN
         }
-        entries = [e for e in entries if e.entry_id in wanted]
+        entries = [e for e in entries if e.unique_id in wanted]
     if not entries:
         raise ServiceValidationError("No Pixel Clock found", translation_domain=DOMAIN, translation_key="no_device")
     return [e.runtime_data for e in entries]

@@ -17,6 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 ACK_TIMEOUT = 8.0
 COMMAND_ACK_TIMEOUT = 3.0
 INFO_TIMEOUT = 5.0
+FAST_CHUNK_PAUSE = 0.008  # s between writes without response (~0.2 s per 12 KB window)
 
 
 class PixelClockClient:
@@ -101,6 +102,9 @@ class PixelClockClient:
         size = max(20, min(proto.MAX_CHUNK, client.mtu_size - 3))
         for chunk in proto.chunks(data, size):
             await client.write_gatt_char(proto.WRITE_UUID, chunk, response=not fast)
+            if fast:
+                # without the pause BlueZ on the Pi pushed a 12 KB window faster than the panel takes it
+                await asyncio.sleep(FAST_CHUNK_PAUSE)
 
     async def _command(self, client: BleakClientWithServiceCache, data: bytes) -> None:
         self._drain_acks()
