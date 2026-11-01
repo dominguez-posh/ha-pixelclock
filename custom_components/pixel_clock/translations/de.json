@@ -1,0 +1,111 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "bluetooth_confirm": {
+        "description": "{name} ({address}, {size} Pixel) hinzufügen?"
+      },
+      "user": {
+        "data": { "address": "Display" }
+      }
+    },
+    "abort": {
+      "already_configured": "Dieses Display ist bereits eingerichtet.",
+      "no_devices_found": "Kein iPixel-Display (LED_BLE_…) in Reichweite eines verbindungsfähigen Bluetooth-Adapters.",
+      "not_supported": "Kein iPixel-Display."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Apps auf dem Display",
+        "data": {
+          "show_clock": "Uhr",
+          "show_date": "Datum",
+          "weather_entity": "Wetter",
+          "power_entity": "Aktueller Verbrauch (W, negativ = Einspeisung)",
+          "calendar_entities": "Kalender (nächster Termin)",
+          "calendar_days": "Vorschau (Tage)",
+          "sensor_entities": "Weitere Werte (je eine App)",
+          "color": "Textfarbe"
+        }
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "next_app": { "name": "Nächste App" },
+      "dismiss": { "name": "Benachrichtigung beenden" }
+    },
+    "image": {
+      "preview": { "name": "Vorschau" }
+    },
+    "number": {
+      "app_duration": { "name": "Anzeigedauer pro App" }
+    },
+    "select": {
+      "mode": {
+        "name": "Modus",
+        "state": { "apps": "Apps", "native_clock": "Eingebaute Uhr" }
+      },
+      "clock_style": { "name": "Ziffernblatt eingebaute Uhr" }
+    },
+    "sensor": {
+      "current_app": { "name": "Aktuelle App" },
+      "panel": { "name": "Display" }
+    },
+    "switch": {
+      "auto_rotate": { "name": "Apps wechseln" }
+    },
+    "text": {
+      "message": { "name": "Nachricht" }
+    }
+  },
+  "exceptions": {
+    "no_device": { "message": "Keine Pixel Clock gefunden." }
+  },
+  "services": {
+    "notify": {
+      "name": "Benachrichtigen",
+      "description": "Zeigt sofort eine Benachrichtigung, danach läuft die App-Rotation weiter.",
+      "fields": {
+        "device_id": { "name": "Display", "description": "Zu verwendende Displays (Standard: alle)." },
+        "text": { "name": "Text", "description": "Text; ein Zeilenumbruch ergibt zwei Zeilen. Langer Text läuft durch." },
+        "icon": { "name": "Icon", "description": "Eingebauter Name (bell, power, sun, calendar, warning, heart, …), LaMetric-Icon-ID oder Bilddatei." },
+        "color": { "name": "Farbe", "description": "Textfarbe." },
+        "duration": { "name": "Dauer", "description": "Sekunden (Standard 10 s oder ein Durchlauf)." },
+        "progress": { "name": "Fortschritt", "description": "Fortschrittsbalken 0-100 %." },
+        "progress_color": { "name": "Fortschrittsfarbe", "description": "Farbe des Fortschrittsbalkens." }
+      }
+    },
+    "set_app": {
+      "name": "App setzen",
+      "description": "Legt eine App in der Rotation an oder aktualisiert sie. Der Text darf Templates enthalten, sie werden bei jeder Anzeige neu ausgewertet.",
+      "fields": {
+        "device_id": { "name": "Display", "description": "Zu verwendende Displays (Standard: alle)." },
+        "name": { "name": "Name", "description": "Eindeutiger App-Name (klein, ohne Leerzeichen)." },
+        "text": { "name": "Text", "description": "Text oder Template; ein Zeilenumbruch ergibt zwei Zeilen." },
+        "icon": { "name": "Icon", "description": "Eingebauter Name, LaMetric-Icon-ID oder Bilddatei." },
+        "color": { "name": "Farbe", "description": "Textfarbe." },
+        "progress": { "name": "Fortschritt", "description": "Fortschrittsbalken 0-100 %." },
+        "progress_color": { "name": "Fortschrittsfarbe", "description": "Farbe des Fortschrittsbalkens." },
+        "lifetime": { "name": "Lebensdauer", "description": "App entfernen, wenn sie so viele Sekunden nicht aktualisiert wurde." }
+      }
+    },
+    "remove_app": {
+      "name": "App entfernen",
+      "description": "Entfernt eine mit set_app angelegte App.",
+      "fields": {
+        "device_id": { "name": "Display", "description": "Zu verwendende Displays (Standard: alle)." },
+        "name": { "name": "Name", "description": "App-Name." }
+      }
+    },
+    "dismiss": {
+      "name": "Benachrichtigung beenden",
+      "description": "Beendet die gerade angezeigte Benachrichtigung.",
+      "fields": {
+        "device_id": { "name": "Display", "description": "Zu verwendende Displays (Standard: alle)." }
+      }
+    }
+  }
+}

@@ -1,0 +1,70 @@
+notify:
+  fields:
+    device_id: &device
+      selector:
+        device:
+          multiple: true
+          integration: pixel_clock
+    text:
+      required: true
+      example: "Waschmaschine fertig"
+      selector:
+        text:
+          multiline: true
+    icon: &icon
+      example: "bell"
+      selector:
+        text:
+    color: &color
+      selector:
+        color_rgb:
+    duration:
+      selector:
+        number:
+          min: 1
+          max: 3600
+          unit_of_measurement: s
+    progress: &progress
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    progress_color: *color
+
+set_app:
+  fields:
+    device_id: *device
+    name:
+      required: true
+      example: "pv"
+      selector:
+        text:
+    text:
+      required: true
+      example: "{{ states('sensor.pv_power') }} W"
+      selector:
+        text:
+          multiline: true
+    icon: *icon
+    color: *color
+    progress: *progress
+    progress_color: *color
+    lifetime:
+      selector:
+        number:
+          min: 10
+          max: 604800
+          unit_of_measurement: s
+
+remove_app:
+  fields:
+    device_id: *device
+    name:
+      required: true
+      selector:
+        text:
+
+dismiss:
+  fields:
+    device_id: *device
