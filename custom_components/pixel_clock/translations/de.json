@@ -48,7 +48,16 @@
         "name": "Modus",
         "state": { "apps": "Apps", "native_clock": "Eingebaute Uhr" }
       },
-      "clock_style": { "name": "Ziffernblatt eingebaute Uhr" }
+      "clock_style": { "name": "Ziffernblatt eingebaute Uhr" },
+      "orientation": {
+        "name": "Ausrichtung",
+        "state": {
+          "landscape": "Quer",
+          "portrait_left": "Hochkant (linkes Ende oben)",
+          "portrait_right": "Hochkant (rechtes Ende oben)",
+          "upside_down": "Quer, auf dem Kopf"
+        }
+      }
     },
     "sensor": {
       "current_app": { "name": "Aktuelle App" },

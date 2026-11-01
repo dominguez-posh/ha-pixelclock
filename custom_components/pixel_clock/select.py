@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import protocol as proto
+from . import render
 from .const import MODES
 from .coordinator import PixelClockConfigEntry
 from .entity import PixelClockEntity
@@ -16,7 +17,11 @@ from .entity import PixelClockEntity
 async def async_setup_entry(hass: HomeAssistant, entry: PixelClockConfigEntry,
                             async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     coordinator = entry.runtime_data
-    async_add_entities([ModeSelect(coordinator, "mode"), ClockStyleSelect(coordinator, "clock_style")])
+    async_add_entities([
+        ModeSelect(coordinator, "mode"),
+        ClockStyleSelect(coordinator, "clock_style"),
+        OrientationSelect(coordinator, "orientation"),
+    ])
 
 
 class ModeSelect(PixelClockEntity, SelectEntity):
@@ -28,6 +33,20 @@ class ModeSelect(PixelClockEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         await self.coordinator.async_set_settings(mode=option)
+
+
+class OrientationSelect(PixelClockEntity, SelectEntity):
+    """Landscape, portrait (panel turned left or right) or upside down; Home Assistant rotates the picture."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_options = list(render.ORIENTATIONS)
+
+    @property
+    def current_option(self) -> str:
+        return self.coordinator.settings.orientation
+
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.async_set_settings(orientation=option)
 
 
 class ClockStyleSelect(PixelClockEntity, SelectEntity):

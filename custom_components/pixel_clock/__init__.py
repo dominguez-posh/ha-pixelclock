@@ -32,7 +32,7 @@ _CONTENT = {
     vol.Required("text"): cv.string,
     vol.Optional("icon"): cv.string,
     vol.Optional("color"): _COLOR,
-    vol.Optional("progress"): vol.All(vol.Coerce(float), vol.Range(min=0, max=100)),
+    vol.Optional("progress"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0, max=100))),
     vol.Optional("progress_color"): _COLOR,
 }
 NOTIFY_SCHEMA = vol.Schema({

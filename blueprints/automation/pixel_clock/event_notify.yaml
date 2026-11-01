@@ -1,0 +1,77 @@
+blueprint:
+  name: "Pixel Clock: Benachrichtigung bei Ereignis"
+  description: >-
+    Blendet eine Benachrichtigung ein, wenn eine Entität in einen Zustand wechselt, z. B.
+    Spülmaschine fertig, Saugroboter-Behälter voll, jemand kommt nach Hause.
+  domain: automation
+  source_url: https://github.com/dominguez-posh/ha-pixelclock/blob/main/blueprints/automation/pixel_clock/event_notify.yaml
+  input:
+    clock:
+      name: Pixel Clock
+      selector:
+        device:
+          integration: pixel_clock
+    entity:
+      name: Entität
+      selector:
+        entity:
+          multiple: true
+    to_state:
+      name: Neuer Zustand
+      description: z. B. on, home, finished. Leer = jede Änderung.
+      default: ""
+      selector:
+        text:
+    text:
+      name: Text
+      description: Text oder Template; trigger.to_state steht zur Verfügung.
+      selector:
+        text:
+    icon:
+      name: Icon
+      default: bell
+      selector:
+        select:
+          custom_value: true
+          options: [battery, bell, calendar, car, check, cloud, door, drop, fog, heart, house, info,
+                    moon, partlycloudy, power, rain, snow, solar, sun, thermometer, thunder, trash,
+                    warning, wind]
+    color:
+      name: Textfarbe
+      default: [255, 255, 255]
+      selector:
+        color_rgb:
+    duration:
+      name: Anzeigedauer
+      default: 15
+      selector:
+        number:
+          min: 3
+          max: 600
+          unit_of_measurement: s
+
+mode: queued
+
+triggers:
+  - trigger: state
+    entity_id: !input entity
+
+variables:
+  to_state: !input to_state
+
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.from_state is not none and trigger.to_state is not none
+         and trigger.from_state.state not in ['unavailable', 'unknown']
+         and trigger.from_state.state != trigger.to_state.state
+         and (to_state == '' or trigger.to_state.state == to_state) }}
+
+actions:
+  - action: pixel_clock.notify
+    data:
+      device_id: !input clock
+      text: !input text
+      icon: !input icon
+      color: !input color
+      duration: !input duration

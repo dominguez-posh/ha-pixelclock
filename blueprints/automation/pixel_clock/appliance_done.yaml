@@ -1,0 +1,111 @@
+blueprint:
+  name: "Pixel Clock: Gerät fertig (Leistungsmessung)"
+  description: >-
+    Für Geräte an einer Messsteckdose, z. B. Waschmaschine oder Trockner: zeigt eine Seite
+    "läuft", solange das Gerät Strom zieht, und meldet "fertig", sobald die Leistung eine
+    Weile unter der Schwelle bleibt.
+  domain: automation
+  source_url: https://github.com/dominguez-posh/ha-pixelclock/blob/main/blueprints/automation/pixel_clock/appliance_done.yaml
+  input:
+    clock:
+      name: Pixel Clock
+      selector:
+        device:
+          integration: pixel_clock
+    power:
+      name: Leistung
+      selector:
+        entity:
+          domain: sensor
+          device_class: power
+    device_name:
+      name: Gerätename
+      default: Waschmaschine
+      selector:
+        text:
+    start_watts:
+      name: Läuft ab (W)
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 2000
+          unit_of_measurement: W
+          mode: box
+    stop_watts:
+      name: Fertig unter (W)
+      default: 3
+      selector:
+        number:
+          min: 0
+          max: 500
+          unit_of_measurement: W
+          mode: box
+    stop_minutes:
+      name: Fertig nach (Minuten unter der Schwelle)
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 30
+          unit_of_measurement: min
+    icon:
+      name: Icon
+      default: drop
+      selector:
+        select:
+          custom_value: true
+          options: [battery, bell, check, drop, house, info, power, warning]
+    show_running:
+      name: Seite "läuft" zeigen
+      default: true
+      selector:
+        boolean:
+
+mode: single
+max_exceeded: silent
+
+triggers:
+  - trigger: numeric_state
+    entity_id: !input power
+    above: !input start_watts
+    for:
+      minutes: 1
+
+variables:
+  device_name: !input device_name
+  app_name: "{{ device_name | lower | replace(' ', '_') | replace('ä', 'ae') | replace('ö', 'oe') | replace('ü', 'ue') | replace('ß', 'ss') }}"
+  show_running: !input show_running
+
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ show_running }}"
+    then:
+      - action: pixel_clock.set_app
+        data:
+          device_id: !input clock
+          name: "{{ app_name }}"
+          text: "{{ device_name }} läuft"
+          icon: !input icon
+          lifetime: 43200
+  - wait_for_trigger:
+      - trigger: numeric_state
+        entity_id: !input power
+        below: !input stop_watts
+        for:
+          minutes: !input stop_minutes
+    timeout:
+      hours: 12
+    continue_on_timeout: false
+  - action: pixel_clock.remove_app
+    data:
+      device_id: !input clock
+      name: "{{ app_name }}"
+  - action: pixel_clock.notify
+    data:
+      device_id: !input clock
+      text: "{{ device_name }} fertig!"
+      icon: check
+      color: [0, 200, 60]
+      duration: 30

@@ -100,6 +100,7 @@ class _Settings:
     brightness: int = DEFAULT_BRIGHTNESS
     mode: str = MODE_APPS
     clock_style: int = 1
+    orientation: str = "landscape"
     auto_rotate: bool = True
     app_seconds: int = DEFAULT_APP_SECONDS
     custom_apps: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -242,7 +243,7 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
                 self._native_clock_shown = True
                 self._shown = None
             # the panel draws its own clock face: the preview only approximates it
-            approx = render.render_clock(now, self.width, self.height, self._color())
+            approx = self._clock(now)
             self.data.preview = await self.hass.async_add_executor_job(render.preview, approx)
             self.data.preview_updated = dt_util.utcnow()
             self._publish(APP_CLOCK)
@@ -312,8 +313,8 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         return rendered
 
     def _render(self, what: Screen | render.Rendered) -> tuple[render.Rendered, bytes, bool, str]:
-        rendered = what if isinstance(what, render.Rendered) else render.render_screen(what, self.width, self.height)
-        data, is_gif = render.encode(rendered)
+        rendered = what if isinstance(what, render.Rendered) else render.render_screen(what, *self.view_size)
+        data, is_gif = render.encode(render.to_panel(rendered, self.settings.orientation))
         return rendered, data, is_gif, hashlib.sha1(data).hexdigest()
 
     def _publish(self, app: str) -> None:
@@ -363,9 +364,12 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         color = self._color()
         lang = self.language
         if app == APP_CLOCK:
-            return render.render_clock(now, self.width, self.height, color)
+            return self._clock(now)
         if app == APP_DATE:
-            if self.height >= 16:
+            if self.tall:
+                return Screen([Line(WEEKDAYS_SHORT[lang][now.weekday()], color),
+                               Line(now.strftime("%d."), (0, 200, 230)), Line(now.strftime("%m."), (0, 200, 230))])
+            if self.view_size[1] >= 16:
                 return Screen([Line(WEEKDAYS[lang][now.weekday()], color), Line(now.strftime("%d.%m.%Y"), (0, 200, 230))])
             return Screen([Line(f"{WEEKDAYS_SHORT[lang][now.weekday()]} {now.strftime('%d.%m.')}", color)])
         if app == APP_WEATHER:
@@ -383,12 +387,25 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         if app.startswith("app:"):
             spec = self.settings.custom_apps.get(app.removeprefix("app:"))
             if spec is None:
-                return render.render_clock(now, self.width, self.height, color)
+                return self._clock(now)
             text = self._template(spec.get("text", ""))
             return await self._screen_for(
                 text, spec.get("icon"), spec.get("color"), spec.get("progress"), spec.get("progress_color")
             )
-        return render.render_clock(now, self.width, self.height, color)
+        return self._clock(now)
+
+    @property
+    def view_size(self) -> tuple[int, int]:
+        """Drawing size: the panel size, width and height swapped when it hangs in portrait."""
+        return render.view_size(self.width, self.height, self.settings.orientation)
+
+    @property
+    def tall(self) -> bool:
+        width, height = self.view_size
+        return height > width
+
+    def _clock(self, now: datetime) -> render.Rendered:
+        return render.render_clock(now, *self.view_size, self._color(), weekdays=WEEKDAYS_SHORT[self.language])
 
     def _template(self, text: str) -> str:
         if "{" not in text:
@@ -489,7 +506,7 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         else:
             when = WEEKDAYS_SHORT[lang][start.weekday()] + (start.strftime(" %d.%m.") if all_day else start.strftime(" %H:%M"))
         summary = ev.get("summary") or ""
-        if self.height >= 16:
+        if self.view_size[1] >= 16:
             return Screen([Line(when, (255, 190, 0)), Line(summary, self._color())], icon=icon)
         return Screen([Line(f"{when} {summary}", self._color())], icon=icon)
 
@@ -570,7 +587,7 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         for key, value in changes.items():
             setattr(self.settings, key, value)
         await self._save()
-        if "mode" in changes or "clock_style" in changes:
+        if {"mode", "clock_style", "orientation"} & changes.keys():
             self._native_clock_shown = False
             self._shown = None
         if "app_seconds" in changes:

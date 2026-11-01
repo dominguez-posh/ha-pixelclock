@@ -59,9 +59,10 @@ class Rendered:
 
 
 def _draw_text(img: Image.Image, text: str, x: int, y: int, color: RGB, scale: int = 1,
-               clip: tuple[int, int] | None = None) -> None:
-    """Draw text with its top-left at (x, y); clip = (x_min, x_max) exclusive."""
+               clip: tuple[int, int] | None = None, clip_y: tuple[int, int] | None = None) -> None:
+    """Draw text with its top-left at (x, y); clip / clip_y = (min, max) exclusive."""
     x_min, x_max = clip if clip else (0, img.width)
+    y_min, y_max = clip_y if clip_y else (0, img.height)
     px = img.load()
     cx = x
     for ch in text:
@@ -70,20 +71,85 @@ def _draw_text(img: Image.Image, text: str, x: int, y: int, color: RGB, scale: i
             for dx in range(scale):
                 for dy in range(scale):
                     xx, yy = cx + gx * scale + dx, y + gy * scale + dy
-                    if x_min <= xx < x_max and 0 <= yy < img.height:
+                    if x_min <= xx < x_max and y_min <= yy < y_max:
                         px[xx, yy] = color
         cx += (g.width + 1) * scale
 
 
-def _paste_icon(img: Image.Image, icon: Image.Image, size: int) -> None:
+def _paste_icon(img: Image.Image, icon: Image.Image, size: int, top: int | None = None) -> None:
+    """Icon scaled to size x size at the left edge, vertically centred unless top is given."""
     if icon.size != (size, size):
         if icon.width <= size and icon.height <= size and size % icon.width == 0 and size % icon.height == 0:
             icon = icon.resize((size, size), Image.Resampling.NEAREST)
         else:
             icon = icon.copy()
             icon.thumbnail((size, size), Image.Resampling.NEAREST)
-    top = (img.height - icon.height) // 2
-    img.paste(icon, ((size - icon.width) // 2, top), icon if icon.mode == "RGBA" else None)
+    y = (img.height - icon.height) // 2 if top is None else top + (size - icon.height) // 2
+    img.paste(icon, ((size - icon.width) // 2, y), icon if icon.mode == "RGBA" else None)
+
+
+def _wrap(text: str, max_w: int, scale: int = 1) -> list[str]:
+    """Greedy word wrap; words wider than max_w are split between characters."""
+    rows: list[str] = []
+    for word in text.split():
+        while font.text_width(word, scale) > max_w and len(word) > 1:
+            cut = 1
+            while cut < len(word) and font.text_width(word[:cut + 1], scale) <= max_w:
+                cut += 1
+            rows.append(word[:cut])
+            word = word[cut:]
+        if rows and font.text_width(f"{rows[-1]} {word}", scale) <= max_w:
+            rows[-1] = f"{rows[-1]} {word}"
+        else:
+            rows.append(word)
+    return rows or [""]
+
+
+def _render_tall(screen: Screen, width: int, height: int) -> Rendered:
+    """Portrait layout: icon on top, wrapped text below, scrolling upwards when it does not fit."""
+    icon_size = width if screen.icon is not None else 0
+    y0 = icon_size + 1 if icon_size else 0
+    area_h = height - y0 - (2 if screen.progress is not None else 0)
+
+    scale = 1
+    if screen.big:
+        for s in range(max(1, width // 5), 1, -1):
+            words = [w for line in screen.lines for w in line.text.split()]
+            rows = [(r, line.color) for line in screen.lines for r in _wrap(line.text, width, s)]
+            if all(font.text_width(w, s) <= width for w in words) and \
+                    len(rows) * font.LINE_HEIGHT * s - s <= area_h:
+                scale = s
+                break
+    rows = [(r, line.color) for line in screen.lines for r in _wrap(line.text, width, scale)]
+    line_h = font.LINE_HEIGHT * scale
+    block_h = len(rows) * line_h - scale  # no gap after the last line
+
+    base = Image.new("RGB", (width, height), screen.background)
+    if screen.icon is not None:
+        _paste_icon(base, screen.icon, icon_size, top=0)
+    if screen.progress is not None:
+        p = max(0.0, min(100.0, screen.progress))
+        for x in range(width):
+            base.putpixel((x, height - 1), screen.progress_color if x < round(width * p / 100) else DIM)
+
+    def draw(img: Image.Image, top: int) -> None:
+        for i, (text, color) in enumerate(rows):
+            x = (width - font.text_width(text, scale)) // 2
+            _draw_text(img, text, x, top + i * line_h, color, scale, clip_y=(y0, y0 + area_h))
+
+    if block_h <= area_h:
+        img = base.copy()
+        draw(img, y0 + (area_h - block_h) // 2)
+        return Rendered([img])
+
+    cycle = block_h + area_h
+    step = max(SCROLL_STEP, -(-cycle // MAX_FRAMES))
+    frames = []
+    for t in range(0, cycle, step):
+        img = base.copy()
+        draw(img, y0 + area_h - t)
+        frames.append(img)
+    return Rendered(frames, [SCROLL_FRAME_MS * 2] * len(frames))  # vertical scrolling reads better slower
 
 
 def _layout(screen: Screen, width: int, height: int) -> tuple[int, int, int, list[int]]:
@@ -118,6 +184,8 @@ def _layout(screen: Screen, width: int, height: int) -> tuple[int, int, int, lis
 
 
 def render_screen(screen: Screen, width: int, height: int) -> Rendered:
+    if height > width:
+        return _render_tall(screen, width, height)
     x0, area_w, scale, tops = _layout(screen, width, height)
     lines = screen.lines[: len(tops)]
     widths = [font.text_width(line.text, scale) for line in lines]
@@ -162,8 +230,10 @@ def render_screen(screen: Screen, width: int, height: int) -> Rendered:
 
 def render_clock(now: datetime, width: int, height: int, color: RGB = WHITE,
                  weekday_color: RGB | None = None, blink: bool = True,
-                 weekday_bar: bool = True) -> Rendered:
+                 weekday_bar: bool = True, weekdays: tuple[str, ...] | None = None) -> Rendered:
     """Big HH:MM with a blinking colon and a Monday-first weekday bar at the bottom."""
+    if height > width:
+        return _render_clock_tall(now, width, height, color, blink, weekday_color, weekdays or WEEKDAYS_SHORT)
     bar_h = 1 if weekday_bar and height >= 12 else 0
     avail_h = height - (bar_h + 1 if bar_h else 0)
     digits = now.strftime("%H:%M")
@@ -196,6 +266,53 @@ def render_clock(now: datetime, width: int, height: int, color: RGB = WHITE,
     if not blink:
         return Rendered([frame(True)])
     return Rendered([frame(True), frame(False)], [BLINK_MS, BLINK_MS])
+
+
+WEEKDAYS_SHORT = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
+
+
+def _render_clock_tall(now: datetime, width: int, height: int, color: RGB, blink: bool,
+                       weekday_color: RGB | None, weekdays: tuple[str, ...] = WEEKDAYS_SHORT) -> Rendered:
+    """Portrait clock: HH, blinking colon, MM; below weekday, day and month when there is room."""
+
+    def centered(img: Image.Image, text: str, y: int, c: RGB) -> None:
+        _draw_text(img, text, (width - font.text_width(text)) // 2, y, c)
+
+    def frame(colon: bool) -> Image.Image:
+        img = Image.new("RGB", (width, height), BLACK)
+        centered(img, now.strftime("%H"), 1, color)
+        if colon:
+            cx = width // 2 - 1
+            for y in (10, 12):
+                img.putpixel((cx, y), color)
+                img.putpixel((cx + 1, y), color)
+        centered(img, now.strftime("%M"), 15, color)
+        if height >= 56:
+            centered(img, weekdays[now.weekday()], 28, weekday_color or (255, 190, 0))
+            centered(img, now.strftime("%d."), 38, (0, 200, 230))
+            centered(img, now.strftime("%m."), 47, (0, 200, 230))
+        return img
+
+    if not blink:
+        return Rendered([frame(True)])
+    return Rendered([frame(True), frame(False)], [BLINK_MS, BLINK_MS])
+
+
+# orientation -> counter-clockwise rotation of the drawn picture; portrait_left = the end that is
+# left in landscape points up (the top of the picture lands on the left end of the panel)
+ORIENTATIONS: dict[str, int] = {"landscape": 0, "portrait_left": 90, "portrait_right": 270, "upside_down": 180}
+
+
+def view_size(width: int, height: int, orientation: str) -> tuple[int, int]:
+    """Size to draw on: portrait swaps the panel's width and height."""
+    return (height, width) if ORIENTATIONS.get(orientation, 0) in (90, 270) else (width, height)
+
+
+def to_panel(rendered: Rendered, orientation: str) -> Rendered:
+    angle = ORIENTATIONS.get(orientation, 0)
+    if not angle:
+        return rendered
+    return Rendered([f.rotate(angle, expand=True) for f in rendered.frames], rendered.durations)
 
 
 def encode(rendered: Rendered) -> tuple[bytes, bool]:

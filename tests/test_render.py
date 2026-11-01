@@ -65,6 +65,30 @@ def test_gif_shares_a_small_palette():
         assert img.n_frames == len(r.frames)
 
 
+def test_portrait_is_drawn_tall_and_rotated_for_the_panel():
+    vw, vh = render.view_size(W, H, "portrait_left")
+    assert (vw, vh) == (16, 64)
+    r = render.render_screen(Screen([Line("11°")], icon=icons.builtin_icon("cloud")), vw, vh)
+    assert r.frames[0].size == (16, 64) and not r.animated
+    assert render.to_panel(r, "portrait_left").frames[0].size == (W, H)
+    assert render.to_panel(r, "landscape") is r
+    # the top of the picture (the icon) lands on the left end of the panel
+    panel = lit(render.to_panel(r, "portrait_left").frames[0])
+    assert panel == {(y, vw - 1 - x) for x, y in lit(r.frames[0])}
+    assert min(x for x, _ in panel) < 16
+
+
+def test_portrait_wraps_and_scrolls_long_text():
+    rows = render._wrap("Waschmaschine fertig", 16)
+    assert all(font.text_width(r) <= 16 for r in rows)
+    assert "".join(rows).replace(" ", "") == "Waschmaschinefertig"
+    assert render._wrap("11° kW", 16) == ["11°", "kW"]
+    r = render.render_screen(Screen([Line("Waschmaschine fertig")], icon=icons.builtin_icon("bell")), 16, 64)
+    assert r.animated
+    clock = render.render_clock(datetime(2026, 11, 1, 9, 5), 16, 64)
+    assert clock.frames[0].size == (16, 64) and len(clock.frames) == 2
+
+
 def test_parse_color():
     assert render.parse_color("#ff8000") == (255, 128, 0)
     assert render.parse_color([300, -1, 5]) == (255, 0, 5)

@@ -48,7 +48,16 @@
         "name": "Mode",
         "state": { "apps": "Apps", "native_clock": "Built-in clock" }
       },
-      "clock_style": { "name": "Built-in clock face" }
+      "clock_style": { "name": "Built-in clock face" },
+      "orientation": {
+        "name": "Orientation",
+        "state": {
+          "landscape": "Landscape",
+          "portrait_left": "Portrait (left end on top)",
+          "portrait_right": "Portrait (right end on top)",
+          "upside_down": "Landscape, upside down"
+        }
+      }
     },
     "sensor": {
       "current_app": { "name": "Current app" },

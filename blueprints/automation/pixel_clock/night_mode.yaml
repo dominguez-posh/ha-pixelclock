@@ -1,0 +1,83 @@
+blueprint:
+  name: "Pixel Clock: Nachtmodus"
+  description: >-
+    Dimmt die Pixel Clock nachts oder schaltet sie aus und stellt morgens die Tageshelligkeit
+    wieder her.
+  domain: automation
+  source_url: https://github.com/dominguez-posh/ha-pixelclock/blob/main/blueprints/automation/pixel_clock/night_mode.yaml
+  input:
+    display:
+      name: Pixel Clock (Licht-Entität)
+      selector:
+        entity:
+          domain: light
+          integration: pixel_clock
+    night_start:
+      name: Nacht ab
+      default: "22:30:00"
+      selector:
+        time:
+    night_end:
+      name: Tag ab
+      default: "06:30:00"
+      selector:
+        time:
+    night_brightness:
+      name: Helligkeit nachts (0 = aus)
+      default: 5
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    day_brightness:
+      name: Helligkeit tagsüber
+      default: 50
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+
+mode: single
+
+triggers:
+  - trigger: time
+    at: !input night_start
+    id: night
+  - trigger: time
+    at: !input night_end
+    id: day
+
+variables:
+  night_brightness: !input night_brightness
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: night
+          - condition: template
+            value_template: "{{ night_brightness | int == 0 }}"
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id: !input display
+      - conditions:
+          - condition: trigger
+            id: night
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: !input display
+            data:
+              brightness_pct: !input night_brightness
+      - conditions:
+          - condition: trigger
+            id: day
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: !input display
+            data:
+              brightness_pct: !input day_brightness

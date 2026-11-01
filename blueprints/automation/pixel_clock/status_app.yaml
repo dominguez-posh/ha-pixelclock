@@ -1,0 +1,92 @@
+blueprint:
+  name: "Pixel Clock: Status-App solange aktiv"
+  description: >-
+    Zeigt eine Seite nur, solange ein Gerät in einem bestimmten Zustand ist, z. B. die
+    Spülmaschine läuft (mit Restzeit und Fortschritt) oder das Auto lädt (mit Akkustand).
+    Danach verschwindet die Seite wieder.
+  domain: automation
+  source_url: https://github.com/dominguez-posh/ha-pixelclock/blob/main/blueprints/automation/pixel_clock/status_app.yaml
+  input:
+    clock:
+      name: Pixel Clock
+      selector:
+        device:
+          integration: pixel_clock
+    app_name:
+      name: Name der Seite
+      description: Eindeutig, klein, ohne Leerzeichen (z. B. spuelmaschine).
+      selector:
+        text:
+    entity:
+      name: Gerät / Status-Entität
+      selector:
+        entity:
+    active_states:
+      name: Aktive Zustände
+      description: Zustände, in denen die Seite gezeigt wird (z. B. run, charging, on).
+      selector:
+        text:
+          multiple: true
+    text:
+      name: Text
+      description: >-
+        Text oder Template, z. B.
+        {{ (states('sensor.siemens_dishwasher_verbleibende_programmlaufzeit') | float(0) * 60) | round }} min
+      selector:
+        text:
+    icon:
+      name: Icon
+      default: info
+      selector:
+        select:
+          custom_value: true
+          options: [battery, bell, calendar, car, check, cloud, door, drop, fog, heart, house, info,
+                    moon, partlycloudy, power, rain, snow, solar, sun, thermometer, thunder, trash,
+                    warning, wind]
+    color:
+      name: Textfarbe
+      default: [255, 255, 255]
+      selector:
+        color_rgb:
+    progress_entity:
+      name: Fortschritt (optional)
+      description: Sensor mit 0-100 für den Balken, z. B. Programmfortschritt oder Akkustand.
+      default: ""
+      selector:
+        entity:
+
+mode: queued
+
+triggers:
+  - trigger: state
+    entity_id: !input entity
+  - trigger: homeassistant
+    event: start
+  - trigger: time_pattern
+    minutes: "/1"
+
+variables:
+  entity: !input entity
+  active_states: !input active_states
+  progress_entity: !input progress_entity
+  progress_value: >-
+    {{ states(progress_entity) | float(0) if progress_entity and is_number(states(progress_entity)) else none }}
+
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ states(entity) in active_states }}"
+    then:
+      - action: pixel_clock.set_app
+        data:
+          device_id: !input clock
+          name: !input app_name
+          text: !input text
+          icon: !input icon
+          color: !input color
+          progress: "{{ progress_value }}"
+    else:
+      - action: pixel_clock.remove_app
+        data:
+          device_id: !input clock
+          name: !input app_name

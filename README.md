@@ -40,6 +40,7 @@ Copy `custom_components/pixel_clock` into `config/custom_components` and restart
 | Image *Preview* | Live picture of what the panel shows (animated while text scrolls) |
 | Select *Mode* | *Apps* (rotation rendered by Home Assistant) or *Built-in clock* (the panel's own clock face) |
 | Select *Built-in clock face* | Clock face 0–8 for the built-in clock |
+| Select *Orientation* | Landscape, portrait (left or right end on top) or upside down; Home Assistant draws a 16×64 picture and rotates it |
 | Switch *Rotate apps* | Off: stays on the current app (refreshed every 30 s) |
 | Number *App duration* | Seconds per app (scrolling text gets at least one full pass) |
 | Button *Next app* / *Dismiss notification* | |
@@ -79,6 +80,19 @@ Built-in icons: battery, bell, calendar, car, check, cloud, door, drop, fog, hea
 moon, partlycloudy, power, rain, snow, solar, sun, thermometer, thunder, trash, warning, wind.
 LaMetric icons (`developer.lametric.com/icons`) are downloaded once and cached.
 Image files must be in an allowed folder (e.g. `/config/www/…`).
+
+## Blueprints
+
+Pages for the panel without YAML: **Settings → Automations & scenes → Blueprints → Import
+blueprint** with the GitHub URL of a file in `blueprints/automation/pixel_clock/`:
+
+| Blueprint | Example |
+|---|---|
+| `value_app.yaml` – value as a page | car battery with progress bar, CO₂ intensity, room temperature |
+| `status_app.yaml` – page while a device is active | dishwasher with remaining time and progress, car charging |
+| `appliance_done.yaml` – appliance done (power meter) | washing machine "running" page, "done" notification |
+| `event_notify.yaml` – notification on a state change | dishwasher finished, robot bin full, someone comes home |
+| `night_mode.yaml` – night mode | dim or switch off at night |
 
 ## How it works
 

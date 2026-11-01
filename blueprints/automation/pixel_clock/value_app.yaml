@@ -1,0 +1,105 @@
+blueprint:
+  name: "Pixel Clock: Wert als App"
+  description: >-
+    Zeigt einen Sensorwert dauerhaft als eigene Seite in der Rotation der Pixel Clock, z. B.
+    Akkustand des Autos, CO₂-Intensität oder eine Raumtemperatur. Optional mit
+    Fortschrittsbalken. Ist der Wert nicht verfügbar, wird die Seite ausgeblendet.
+  domain: automation
+  source_url: https://github.com/dominguez-posh/ha-pixelclock/blob/main/blueprints/automation/pixel_clock/value_app.yaml
+  input:
+    clock:
+      name: Pixel Clock
+      selector:
+        device:
+          integration: pixel_clock
+    app_name:
+      name: Name der Seite
+      description: Eindeutig, klein, ohne Leerzeichen (z. B. tesla_akku).
+      selector:
+        text:
+    entity:
+      name: Wert
+      selector:
+        entity:
+    prefix:
+      name: Text davor
+      description: Optional, z. B. "Akku".
+      default: ""
+      selector:
+        text:
+    unit:
+      name: Einheit
+      description: Leer = Einheit des Sensors.
+      default: ""
+      selector:
+        text:
+    decimals:
+      name: Nachkommastellen
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 3
+          mode: box
+    icon:
+      name: Icon
+      description: Eingebautes Icon, LaMetric-Icon-ID oder Bilddatei (/config/www/...).
+      default: info
+      selector:
+        select:
+          custom_value: true
+          options: [battery, bell, calendar, car, check, cloud, door, drop, fog, heart, house, info,
+                    moon, partlycloudy, power, rain, snow, solar, sun, thermometer, thunder, trash,
+                    warning, wind]
+    color:
+      name: Textfarbe
+      default: [255, 255, 255]
+      selector:
+        color_rgb:
+    progress:
+      name: Fortschrittsbalken aus dem Wert
+      description: Zeigt den Wert (0-100) zusätzlich als Balken, z. B. für Akkustände.
+      default: false
+      selector:
+        boolean:
+
+mode: restart
+
+triggers:
+  - trigger: state
+    entity_id: !input entity
+  - trigger: homeassistant
+    event: start
+  - trigger: time_pattern
+    minutes: "/15"
+
+variables:
+  entity: !input entity
+  prefix: !input prefix
+  unit_input: !input unit
+  decimals: !input decimals
+  progress: !input progress
+  value: >-
+    {% set v = states(entity) %}
+    {% if is_number(v) %}{{ (v | float) | round(decimals | int) | string | replace('.', ',') }}{% else %}{{ v }}{% endif %}
+  unit: "{{ unit_input if unit_input else state_attr(entity, 'unit_of_measurement') or '' }}"
+  text: "{{ (prefix ~ ' ' if prefix else '') ~ value ~ ('' if unit in ['', '%', '°C'] else ' ') ~ unit }}"
+
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ states(entity) in ['unavailable', 'unknown'] }}"
+    then:
+      - action: pixel_clock.remove_app
+        data:
+          device_id: !input clock
+          name: !input app_name
+    else:
+      - action: pixel_clock.set_app
+        data:
+          device_id: !input clock
+          name: !input app_name
+          text: "{{ text }}"
+          icon: !input icon
+          color: !input color
+          progress: "{{ (states(entity) | float(0)) if progress and is_number(states(entity)) else None }}"
