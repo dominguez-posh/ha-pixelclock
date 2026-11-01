@@ -120,6 +120,7 @@ class _Shown:
     key: str
     digest: str
     cycle_ms: int
+    valid_until: datetime | None = None
 
 
 @dataclass
@@ -358,15 +359,24 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
             if (wait := self._last_upload + LIVE_REFRESH_SECONDS - time.monotonic()) > 0:
                 await asyncio.sleep(wait)
 
-        rendered = await self._send(current, await self._build(current))
+        shown = self._shown
+        if shown is not None and shown.key == current and shown.valid_until and dt_util.now() < shown.valid_until:
+            # still on screen and still correct (clock with running seconds): sending it again
+            # would restart the GIF and make the seconds jump
+            scroll_ms = 0
+        else:
+            rendered = await self._send(current, await self._build(current))
+            scroll_ms = rendered.scroll_ms
         if self._app_until == 0:
             # counted from the end of the upload, which can take seconds for scrolling text
-            seconds = max(self.settings.app_seconds, rendered.scroll_ms / 1000)
+            seconds = max(self.settings.app_seconds, scroll_ms / 1000)
             self._app_until = time.monotonic() + seconds
         self._publish(current)
 
         timeout = self._app_until - time.monotonic() if self.settings.auto_rotate else 30
-        if current == APP_CLOCK:
+        if self._shown is not None and self._shown.key == current and self._shown.valid_until:
+            timeout = min(timeout, (self._shown.valid_until - dt_util.now()).total_seconds() + 0.05)
+        elif current == APP_CLOCK:
             now = dt_util.now()
             timeout = min(timeout, 60 - now.second - now.microsecond / 1e6 + 0.05)
         await self._sleep(min(timeout, 30))
@@ -378,7 +388,7 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
             return rendered
         await self.client.async_send_image(self._ble_device(), data, is_gif)
         self._last_upload = time.monotonic()
-        self._shown = _Shown(key, digest, rendered.cycle_ms)
+        self._shown = _Shown(key, digest, rendered.cycle_ms, rendered.valid_until)
         self._native_clock_shown = False
         self._schedule_preview(rendered)
         return rendered

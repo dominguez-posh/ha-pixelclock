@@ -6,7 +6,7 @@ Pure Pillow, no Home Assistant imports, so it can be tested and previewed on its
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 
 from PIL import Image, ImageDraw
@@ -50,6 +50,9 @@ class Rendered:
     frames: list[Image.Image]
     durations: list[int] = field(default_factory=list)  # ms per frame, empty for a still image
     scrolls: bool = False  # text scrolls (effects and the clock's seconds only loop)
+    # the picture stays correct until then (clock with seconds: end of the minute); sending it again
+    # earlier would restart the GIF and make the seconds jump
+    valid_until: datetime | None = None
 
     @property
     def animated(self) -> bool:
@@ -282,7 +285,8 @@ def _clock_frames(now: datetime, width: int, height: int, effect: str, blink: bo
         frames.append(img)
     if len(frames) == 1:
         return Rendered(frames)
-    return Rendered(frames, [ms for _, _, ms, _ in timeline])
+    valid_until = now.replace(second=0, microsecond=0) + timedelta(minutes=1) if seconds else None
+    return Rendered(frames, [ms for _, _, ms, _ in timeline], valid_until=valid_until)
 
 
 def render_clock(now: datetime, width: int, height: int, color: RGB = WHITE,

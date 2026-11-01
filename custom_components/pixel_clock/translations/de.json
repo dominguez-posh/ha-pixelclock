@@ -81,7 +81,7 @@
         "name": "Apps wechseln"
       },
       "page_custom": {
-        "name": "Seite {name}"
+        "name": "Automations-Seite {name}"
       },
       "app": {
         "name": "Seite {name}"

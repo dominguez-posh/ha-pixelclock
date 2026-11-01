@@ -81,7 +81,7 @@
         "name": "Rotate apps"
       },
       "page_custom": {
-        "name": "Page {name}"
+        "name": "Automation page {name}"
       },
       "app": {
         "name": "Page {name}"
