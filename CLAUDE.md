@@ -20,6 +20,13 @@ Home Assistant custom integration `pixel_clock` for iPixel Color BLE LED panels 
 - While HA is connected the panel does not advertise: for laptop tests disable the entry
   (`config_entries/disable`) and enable it again afterwards.
 
+- SSH works from the 10.10.52.x Wi-Fi (`ssh -i ~/.ssh/ha_claude root@10.10.52.130`); blueprints
+  were copied to /config/blueprints/automation/pixel_clock/ that way (HACS does not install them).
+- In HA: 9 example automations `automation.pixel_clock_*` (Tesla battery/charging, dishwasher,
+  washing machine, Kehrbert, welcome home, night mode, living room temperature) and the dashboard
+  `/pixel-clock` (created by script via lovelace/config/save).
+- README images come from `tools/docs_images.py`; Action article: action.com/de-de/p/3226274.
+
 ## Ideas not done yet
 
 - Animated LaMetric icons (only the first frame is used), night dimming, 12 h clock.
