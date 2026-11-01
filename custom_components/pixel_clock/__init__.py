@@ -188,6 +188,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PixelClockConfigEntry) -
         for app in (_app(T_CLOCK, "Uhr"), _app(T_DATE, "Datum")):
             hass.config_entries.async_add_subentry(entry, app)
         hass.config_entries.async_update_entry(entry, data={**entry.data, CONF_DEFAULT_APPS: True})
+    _detach_from_subentries(hass, entry)
     coordinator = PixelClockCoordinator(hass, entry)
     entry.runtime_data = coordinator
     coordinator.loaded_apps = set(coordinator.apps)
@@ -195,6 +196,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: PixelClockConfigEntry) -
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_entry_updated))
     return True
+
+
+def _detach_from_subentries(hass: HomeAssistant, entry: PixelClockConfigEntry) -> None:
+    """Entities and the device belong to the entry, not to an app subentry.
+
+    f07d198 added the app switches with config_subentry_id, which moved the shared device into
+    one app; re-create those entities without subentry and move the device back.
+    """
+    entities = er.async_get(hass)
+    for ent in er.async_entries_for_config_entry(entities, entry.entry_id):
+        if ent.config_subentry_id is not None:
+            entities.async_remove(ent.entity_id)
+    devices = dr.async_get(hass)
+    for device in dr.async_entries_for_config_entry(devices, entry.entry_id):
+        if device.config_subentry_id is not None:
+            devices.async_update_device(device.id, new_config_subentry_id=None)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: PixelClockConfigEntry) -> bool:

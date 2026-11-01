@@ -18,13 +18,12 @@ from .entity import PixelClockEntity
 async def async_setup_entry(hass: HomeAssistant, entry: PixelClockConfigEntry,
                             async_add_entities: AddConfigEntryEntitiesCallback) -> None:
     coordinator = entry.runtime_data
+    # one switch per app; all on the panel's device (a device belongs to one subentry only)
     async_add_entities([
         AutoRotateSwitch(coordinator, "auto_rotate"),
+        *(AppSwitch(coordinator, subentry) for subentry in coordinator.apps.values()),
         *(CustomPageSwitch(coordinator, name) for name in coordinator.settings.known_apps),
     ])
-    # one switch per app, listed under the app (subentry) on the integration page
-    for subentry in coordinator.apps.values():
-        async_add_entities([AppSwitch(coordinator, subentry)], config_subentry_id=subentry.subentry_id)
     # pages created later by automations (set_app) get their switch right away
     coordinator.on_new_app = lambda name: async_add_entities([CustomPageSwitch(coordinator, name)])
     entry.async_on_unload(lambda: setattr(coordinator, "on_new_app", None))
