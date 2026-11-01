@@ -146,6 +146,7 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         self._unsub_states: CALLBACK_TYPE | None = None
         self.on_new_app: Callable[[str], None] | None = None  # set by the switch platform
         self._last_upload = 0.0
+        self._preview_seq = 0
 
     # ---- lifecycle -------------------------------------------------------------------------
 
@@ -296,8 +297,7 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
                 self._shown = None
             # the panel draws its own clock face: the preview only approximates it
             approx = self._clock(now)
-            self.data.preview = await self.hass.async_add_executor_job(render.preview, approx)
-            self.data.preview_updated = dt_util.utcnow()
+            self._schedule_preview(approx)
             self._publish(APP_CLOCK)
             await self._sleep(60 - now.second + 0.05)
             return
@@ -365,9 +365,22 @@ class PixelClockCoordinator(DataUpdateCoordinator[DisplayState]):
         self._last_upload = time.monotonic()
         self._shown = _Shown(key, digest, rendered.cycle_ms)
         self._native_clock_shown = False
-        self.data.preview = await self.hass.async_add_executor_job(render.preview, rendered)
-        self.data.preview_updated = dt_util.utcnow()
+        self._schedule_preview(rendered)
         return rendered
+
+    def _schedule_preview(self, rendered: render.Rendered) -> None:
+        """Build the preview in the background, so it never delays the panel or the state."""
+        self._preview_seq += 1
+        seq = self._preview_seq
+
+        async def build() -> None:
+            preview = await self.hass.async_add_executor_job(render.preview, rendered)
+            if seq == self._preview_seq:  # a newer picture may have been sent meanwhile
+                self.data.preview = preview
+                self.data.preview_updated = dt_util.utcnow()
+                self.async_update_listeners()
+
+        self.config_entry.async_create_background_task(self.hass, build(), f"{DOMAIN} preview")
 
     def _render(self, what: Screen | render.Rendered) -> tuple[render.Rendered, bytes, bool, str]:
         rendered = what if isinstance(what, render.Rendered) else render.render_screen(what, *self.view_size)

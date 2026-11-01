@@ -346,8 +346,15 @@ def encode(rendered: Rendered) -> tuple[bytes, bool]:
     return out.getvalue(), True
 
 
-def preview(rendered: Rendered, scale: int = 8) -> tuple[bytes, str]:
-    """Upscaled image for the Home Assistant image entity, with dark gaps between the LEDs."""
+def preview(rendered: Rendered, scale: int = 8, animated_scale: int = 4) -> tuple[bytes, str]:
+    """Upscaled image for the Home Assistant image entity, with dark gaps between the LEDs.
+
+    Animations use a smaller scale and every second frame (twice as long): the preview of a long
+    scrolling text was ~500 KB and took seconds on a Raspberry Pi.
+    """
+    if rendered.animated and len(rendered.frames) > 2:
+        scale = animated_scale
+        rendered = Rendered(rendered.frames[::2], [d * 2 for d in rendered.durations[::2]])
 
     def up(img: Image.Image) -> Image.Image:
         big = img.resize((img.width * scale, img.height * scale), Image.Resampling.NEAREST)
