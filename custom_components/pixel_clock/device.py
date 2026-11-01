@@ -17,7 +17,12 @@ _LOGGER = logging.getLogger(__name__)
 ACK_TIMEOUT = 8.0
 COMMAND_ACK_TIMEOUT = 3.0
 INFO_TIMEOUT = 5.0
-FAST_CHUNK_PAUSE = 0.008  # s between writes without response (~0.2 s per 12 KB window)
+# Fast uploads write without response, but every FAST_SYNC_EVERY-th chunk and the last chunk of a
+# window are acknowledged writes: they act as a barrier, so BlueZ never queues more than ~4 KB ahead
+# of the panel (unthrottled, the Pi's adapter lost data in 12 KB windows).
+FAST_SYNC_EVERY = 8
+FAST_ACK_TIMEOUT = 3.0  # a fast upload that is not acknowledged quickly is retried with acknowledged writes
+FAST_FAILURES_LIMIT = 2  # consecutive failures before fast uploads are switched off
 
 
 class PixelClockClient:
@@ -32,6 +37,7 @@ class PixelClockClient:
         self._info: asyncio.Future[bytes] | None = None
         self.device_info: proto.DeviceInfo | None = None
         self.fast_writes = True
+        self._fast_failures = 0
 
     @property
     def connected(self) -> bool:
@@ -98,13 +104,12 @@ class PixelClockClient:
         return False
 
     async def _write(self, client: BleakClientWithServiceCache, data: bytes, fast: bool = False) -> None:
-        """fast: write without response (measured 10x faster); the panel's window ACK is the check."""
+        """fast: mostly writes without response (much faster), see FAST_SYNC_EVERY."""
         size = max(20, min(proto.MAX_CHUNK, client.mtu_size - 3))
-        for chunk in proto.chunks(data, size):
-            await client.write_gatt_char(proto.WRITE_UUID, chunk, response=not fast)
-            if fast:
-                # without the pause BlueZ on the Pi pushed a 12 KB window faster than the panel takes it
-                await asyncio.sleep(FAST_CHUNK_PAUSE)
+        chunks = list(proto.chunks(data, size))
+        for index, chunk in enumerate(chunks):
+            sync = not fast or index % FAST_SYNC_EVERY == FAST_SYNC_EVERY - 1 or index == len(chunks) - 1
+            await client.write_gatt_char(proto.WRITE_UUID, chunk, response=sync)
 
     async def _command(self, client: BleakClientWithServiceCache, data: bytes) -> None:
         self._drain_acks()
@@ -140,18 +145,33 @@ class PixelClockClient:
         """Upload a PNG or GIF and show it (not stored on the panel)."""
         async with self._lock:
             client = await self._ensure_connected(ble_device)
-            fast = self.fast_writes
             windows = proto.image_windows(data, is_gif)
-            self._drain_acks()
-            for index, window in enumerate(windows):
-                await self._write(client, window, fast)
-                if not await self._wait_ack(ACK_TIMEOUT, proto.ACK_WINDOW + (proto.ACK_DONE,)):
-                    if fast:
-                        # data may have been dropped: use acknowledged writes from now on
-                        _LOGGER.warning("%s: no ACK after a fast upload, switching to acknowledged writes", self._name)
-                        self.fast_writes = False
-                    raise TimeoutError(f"no ACK for image window {index + 1}/{len(windows)}")
-            _LOGGER.debug("%s: sent %s bytes (%s, fast=%s)", self._name, len(data), "gif" if is_gif else "png", fast)
+            if self.fast_writes:
+                if await self._upload(client, windows, fast=True):
+                    self._fast_failures = 0
+                    _LOGGER.debug("%s: sent %s bytes (%s, fast)", self._name, len(data), "gif" if is_gif else "png")
+                    return
+                self._fast_failures += 1
+                if self._fast_failures >= FAST_FAILURES_LIMIT:
+                    _LOGGER.warning("%s: fast uploads failed %s times, using acknowledged writes",
+                                    self._name, self._fast_failures)
+                    self.fast_writes = False
+                else:
+                    _LOGGER.debug("%s: fast upload not acknowledged, sending again with acknowledged writes", self._name)
+            if not await self._upload(client, windows, fast=False):
+                raise TimeoutError("no ACK for the image upload")
+            _LOGGER.debug("%s: sent %s bytes (%s)", self._name, len(data), "gif" if is_gif else "png")
+
+    async def _upload(self, client: BleakClientWithServiceCache, windows: list[bytes], fast: bool) -> bool:
+        """Send all windows, each confirmed by the panel's ACK; False when an ACK is missing."""
+        self._drain_acks()
+        for index, window in enumerate(windows):
+            await self._write(client, window, fast)
+            timeout = FAST_ACK_TIMEOUT if fast else ACK_TIMEOUT
+            if not await self._wait_ack(timeout, proto.ACK_WINDOW + (proto.ACK_DONE,)):
+                _LOGGER.debug("%s: no ACK for window %s/%s (fast=%s)", self._name, index + 1, len(windows), fast)
+                return False
+        return True
 
     async def async_disconnect(self) -> None:
         async with self._lock:
